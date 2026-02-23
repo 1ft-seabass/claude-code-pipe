@@ -6,6 +6,8 @@
 
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const config = require('../config.json');
 const JSONLWatcher = require('./watcher');
 const { createApiRouter } = require('./api');
@@ -21,6 +23,28 @@ app.use(express.json());
 // HTTP サーバーを作成（Express と ws の相乗り用）
 const server = http.createServer(app);
 
+// ログディレクトリを作成
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// ログストリームを作成（追記モード）
+const logFilePath = path.join(logsDir, 'server.log');
+const logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+
+// ログ書き込み関数
+function writeLog(category, data) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    category,
+    data
+  };
+  logStream.write(JSON.stringify(logEntry) + '\n');
+}
+
+console.log(`[index] Logging to: ${logFilePath}`);
+
 // JSONL ウォッチャーを作成
 const watcher = new JSONLWatcher(config.watchDir);
 
@@ -33,6 +57,11 @@ setupWebSocket(server, watcher);
 
 // subscribers をセットアップ
 setupSubscribers(config.subscribers, watcher);
+
+// watcher のイベントをログに記録
+watcher.on('message', (event) => {
+  writeLog('watcher-message', event);
+});
 
 // Send 系 API エンドポイント
 // POST /sessions/new - 新しいセッションを開始
@@ -143,6 +172,7 @@ server.listen(port, () => {
 process.on('SIGINT', async () => {
   console.log('\n[index] Shutting down...');
   await watcher.stop();
+  logStream.end();
   server.close(() => {
     console.log('[index] Server closed');
     process.exit(0);
@@ -152,6 +182,7 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   console.log('\n[index] Shutting down...');
   await watcher.stop();
+  logStream.end();
   server.close(() => {
     console.log('[index] Server closed');
     process.exit(0);

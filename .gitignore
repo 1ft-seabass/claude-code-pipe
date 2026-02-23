@@ -145,3 +145,7 @@ config.json
 # gitleaks binary (large binary file)
 bin/gitleaks
 bin/gitleaks.exe
+
+# Server logs
+logs/
+*.log
