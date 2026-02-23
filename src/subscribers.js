@@ -13,8 +13,9 @@ const { URL } = require('url');
  * subscribers の配信をセットアップ
  * @param {Array} subscribers - config.subscribers の配列
  * @param {JSONLWatcher} watcher - JSONL ウォッチャー
+ * @param {EventEmitter} processEvents - sender の processEvents
  */
-function setupSubscribers(subscribers, watcher) {
+function setupSubscribers(subscribers, watcher, processEvents) {
   if (!subscribers || subscribers.length === 0) {
     console.log('[subscribers] No subscribers configured');
     return;
@@ -30,7 +31,42 @@ function setupSubscribers(subscribers, watcher) {
     }
   });
 
+  // processEvents のイベントを監視（キャンセルや終了など）
+  if (processEvents) {
+    processEvents.on('cancel-initiated', (event) => {
+      for (const subscriber of subscribers) {
+        handleProcessEvent(subscriber, 'cancel-initiated', event);
+      }
+    });
+
+    processEvents.on('process-exit', (event) => {
+      for (const subscriber of subscribers) {
+        handleProcessEvent(subscriber, 'process-exit', event);
+      }
+    });
+  }
+
   console.log(`[subscribers] Setup complete for ${subscribers.length} subscriber(s)`);
+}
+
+/**
+ * プロセスイベントを処理（キャンセル、終了など）
+ */
+function handleProcessEvent(subscriber, eventType, event) {
+  const { url, label, level, authorization } = subscriber;
+
+  // レベルに応じて処理（status, summary, stream, stream-status すべてに送信）
+  if (level === 'status' || level === 'summary' || level === 'stream' || level === 'stream-status') {
+    const payload = {
+      type: eventType,
+      sessionId: event.sessionId,
+      pid: event.pid,
+      timestamp: event.timestamp,
+      ...(event.code !== undefined && { code: event.code }),
+      ...(event.signal !== undefined && { signal: event.signal })
+    };
+    postToSubscriber(url, payload, authorization, label);
+  }
 }
 
 /**

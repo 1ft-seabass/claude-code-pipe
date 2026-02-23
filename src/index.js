@@ -13,7 +13,7 @@ const JSONLWatcher = require('./watcher');
 const { createApiRouter } = require('./api');
 const { setupWebSocket } = require('./websocket');
 const { setupSubscribers } = require('./subscribers');
-const { startNewSession, sendToSession, getManagedProcesses } = require('./sender');
+const { startNewSession, sendToSession, getManagedProcesses, processEvents } = require('./sender');
 const { cancel } = require('./canceller');
 
 // Express アプリケーションを作成
@@ -56,16 +56,25 @@ app.use('/', apiRouter);
 setupWebSocket(server, watcher);
 
 // subscribers をセットアップ
-setupSubscribers(config.subscribers, watcher);
+setupSubscribers(config.subscribers, watcher, processEvents);
 
 // watcher のイベントをログに記録
 watcher.on('message', (event) => {
   writeLog('watcher-message', event);
 });
 
+// processEvents のイベントをログに記録
+processEvents.on('cancel-initiated', (event) => {
+  writeLog('cancel-initiated', event);
+});
+
+processEvents.on('process-exit', (event) => {
+  writeLog('process-exit', event);
+});
+
 // Send 系 API エンドポイント
 // POST /sessions/new - 新しいセッションを開始
-app.post('/sessions/new', (req, res) => {
+app.post('/sessions/new', async (req, res) => {
   const { prompt, cwd } = req.body;
 
   if (!prompt) {
@@ -75,7 +84,7 @@ app.post('/sessions/new', (req, res) => {
   const allowedTools = config.send.defaultAllowedTools || [];
 
   try {
-    const result = startNewSession(
+    const result = await startNewSession(
       prompt,
       cwd,
       allowedTools,

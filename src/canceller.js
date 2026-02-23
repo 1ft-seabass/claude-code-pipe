@@ -6,7 +6,7 @@
  * プロトタイプ実装。
  */
 
-const { getManagedProcess } = require('./sender');
+const { getManagedProcess, processEvents } = require('./sender');
 
 /**
  * セッションのプロセスをキャンセル
@@ -25,6 +25,13 @@ function cancel(sessionId, cancelTimeoutMs = 3000) {
   const { proc, pid } = managed;
 
   console.log(`[canceller] Cancelling session: sessionId=${sessionId}, pid=${pid}`);
+
+  // キャンセル開始イベントを発行
+  processEvents.emit('cancel-initiated', {
+    sessionId,
+    pid,
+    timestamp: new Date().toISOString()
+  });
 
   // まず SIGINT を送る
   try {
