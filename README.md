@@ -20,6 +20,12 @@ npm install
 
 ## Configuration
 
+Copy the example config and edit it:
+
+```bash
+cp config.example.json config.json
+```
+
 Edit `config.json`:
 
 ```json
