@@ -1,9 +1,0 @@
-# gitleaks binary (large binary file)
-bin/gitleaks
-bin/gitleaks.exe
-
-# Phase 4（個人用）の場合のみ以下を追加:
-# .husky/
-#
-# Phase 3（チーム全員）の場合は .husky/ をコミットする必要があるため、
-# 上記をコメントアウトしたまま（追加しない）にしてください。
