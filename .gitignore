@@ -137,3 +137,11 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Project specific
+# config.json contains local settings (uncomment to ignore)
+# config.json
+
+# gitleaks binary (large binary file)
+bin/gitleaks
+bin/gitleaks.exe
