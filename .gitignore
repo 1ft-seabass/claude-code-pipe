@@ -149,3 +149,6 @@ bin/gitleaks.exe
 # Server logs
 logs/
 *.log
+
+# PM2 runtime data
+.pm2/
