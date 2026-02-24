@@ -64,6 +64,18 @@ watcher.on('message', (event) => {
 });
 
 // processEvents のイベントをログに記録
+processEvents.on('session-started', (event) => {
+  writeLog('session-started', event);
+});
+
+processEvents.on('session-error', (event) => {
+  writeLog('session-error', event);
+});
+
+processEvents.on('session-timeout', (event) => {
+  writeLog('session-timeout', event);
+});
+
 processEvents.on('cancel-initiated', (event) => {
   writeLog('cancel-initiated', event);
 });

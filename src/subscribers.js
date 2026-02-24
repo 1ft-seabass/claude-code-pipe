@@ -9,6 +9,10 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 
+// エラー履歴管理（直近のエラーを記録して重複警告を防ぐ）
+const errorHistory = new Map(); // key: `${label}:${url}`, value: timestamp
+const ERROR_THROTTLE_MS = 5 * 60 * 1000; // 5分間同じエラーを抑制
+
 /**
  * subscribers の配信をセットアップ
  * @param {Array} subscribers - config.subscribers の配列
@@ -33,6 +37,24 @@ function setupSubscribers(subscribers, watcher, processEvents) {
 
   // processEvents のイベントを監視（キャンセルや終了など）
   if (processEvents) {
+    processEvents.on('session-started', (event) => {
+      for (const subscriber of subscribers) {
+        handleProcessEvent(subscriber, 'session-started', event);
+      }
+    });
+
+    processEvents.on('session-error', (event) => {
+      for (const subscriber of subscribers) {
+        handleProcessEvent(subscriber, 'session-error', event);
+      }
+    });
+
+    processEvents.on('session-timeout', (event) => {
+      for (const subscriber of subscribers) {
+        handleProcessEvent(subscriber, 'session-timeout', event);
+      }
+    });
+
     processEvents.on('cancel-initiated', (event) => {
       for (const subscriber of subscribers) {
         handleProcessEvent(subscriber, 'cancel-initiated', event);
@@ -63,7 +85,9 @@ function handleProcessEvent(subscriber, eventType, event) {
       pid: event.pid,
       timestamp: event.timestamp,
       ...(event.code !== undefined && { code: event.code }),
-      ...(event.signal !== undefined && { signal: event.signal })
+      ...(event.signal !== undefined && { signal: event.signal }),
+      ...(event.error !== undefined && { error: event.error }),
+      ...(event.resumed !== undefined && { resumed: event.resumed })
     };
     postToSubscriber(url, payload, authorization, label);
   }
@@ -182,20 +206,52 @@ function postToSubscriber(urlString, payload, authorization, label) {
 
     const req = client.request(options, (res) => {
       if (res.statusCode >= 400) {
-        console.error(`[subscribers] Failed to post to ${label} (${urlString}): HTTP ${res.statusCode}`);
+        logErrorIfNeeded(
+          `Failed to post to ${label} (${urlString}): HTTP ${res.statusCode}`,
+          label,
+          urlString
+        );
       }
     });
 
     req.on('error', (error) => {
-      console.error(`[subscribers] Error posting to ${label} (${urlString}):`, error.message);
+      logErrorIfNeeded(
+        `Error posting to ${label} (${urlString}): ${error.message}`,
+        label,
+        urlString
+      );
     });
 
     req.write(postData);
     req.end();
 
   } catch (error) {
-    console.error(`[subscribers] Invalid URL for ${label}: ${urlString}`, error.message);
+    logErrorIfNeeded(
+      `Invalid URL for ${label}: ${urlString} - ${error.message}`,
+      label,
+      urlString
+    );
   }
+}
+
+/**
+ * エラーログを出力（直近に同じエラーが出ていなければ）
+ */
+function logErrorIfNeeded(message, label, url) {
+  const key = `${label}:${url}`;
+  const now = Date.now();
+  const lastErrorTime = errorHistory.get(key);
+
+  // 直近5分以内に同じエラーが出ていたらスキップ
+  if (lastErrorTime && (now - lastErrorTime) < ERROR_THROTTLE_MS) {
+    return;
+  }
+
+  // エラーログを出力
+  console.error(`[subscribers] ${message}`);
+
+  // エラー履歴を更新
+  errorHistory.set(key, now);
 }
 
 module.exports = {

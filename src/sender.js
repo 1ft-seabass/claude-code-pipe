@@ -14,6 +14,9 @@ const managedProcesses = new Map();
 // EventEmitter のインスタンス
 const processEvents = new EventEmitter();
 
+// タイムアウト設定（デフォルト: 60秒）
+const SESSION_START_TIMEOUT_MS = 60 * 1000;
+
 /**
  * 新しいセッションを開始
  * @param {string} prompt - プロンプトテキスト
@@ -51,6 +54,7 @@ function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
     const tempSessionId = `temp-${Date.now()}-${pid}`; // 一時的なセッションID
     let actualSessionId = null; // 実際のUUID形式のセッションID
     let firstLineReceived = false;
+    let sessionStartTimeout = null;
 
     // 一時的にマップに登録（後でactualSessionIdに置き換える）
     managedProcesses.set(tempSessionId, {
@@ -58,6 +62,26 @@ function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
       pid,
       startedAt: new Date()
     });
+
+    // タイムアウト設定
+    sessionStartTimeout = setTimeout(() => {
+      if (!firstLineReceived) {
+        const timeoutError = new Error('Session start timeout: Failed to retrieve session ID');
+        console.error(`[sender] ${timeoutError.message}: pid=${pid}`);
+
+        // session-timeout イベント発行
+        processEvents.emit('session-timeout', {
+          sessionId: tempSessionId,
+          pid,
+          timestamp: new Date().toISOString(),
+          error: timeoutError.message
+        });
+
+        proc.kill();
+        managedProcesses.delete(tempSessionId);
+        reject(timeoutError);
+      }
+    }, SESSION_START_TIMEOUT_MS);
 
     // stdout をコールバックに流す
     proc.stdout.on('data', (data) => {
@@ -79,7 +103,21 @@ function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
                 managedProcesses.delete(tempSessionId);
                 managedProcesses.set(actualSessionId, tempInfo);
 
+                // タイムアウトをクリア
+                if (sessionStartTimeout) {
+                  clearTimeout(sessionStartTimeout);
+                  sessionStartTimeout = null;
+                }
+
                 console.log(`[sender] Started new session: sessionId=${actualSessionId}, pid=${pid}`);
+
+                // session-started イベント発行
+                processEvents.emit('session-started', {
+                  sessionId: actualSessionId,
+                  pid,
+                  timestamp: new Date().toISOString()
+                });
+
                 resolve({ pid, sessionId: actualSessionId });
                 break;
               }
@@ -130,6 +168,22 @@ function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
     // プロセス起動エラー
     proc.on('error', (err) => {
       console.error(`[sender] Failed to start process: ${err.message}`);
+
+      // タイムアウトをクリア
+      if (sessionStartTimeout) {
+        clearTimeout(sessionStartTimeout);
+        sessionStartTimeout = null;
+      }
+
+      // session-error イベント発行
+      const sessionId = actualSessionId || tempSessionId;
+      processEvents.emit('session-error', {
+        sessionId,
+        pid,
+        timestamp: new Date().toISOString(),
+        error: err.message
+      });
+
       managedProcesses.delete(tempSessionId);
       reject(err);
     });
@@ -176,6 +230,16 @@ function sendToSession(sessionId, prompt, allowedTools, onData, onError, onExit)
     startedAt: new Date()
   });
 
+  console.log(`[sender] Sent to existing session: sessionId=${sessionId}, pid=${pid}`);
+
+  // session-started イベント発行（既存セッション再開）
+  processEvents.emit('session-started', {
+    sessionId,
+    pid,
+    timestamp: new Date().toISOString(),
+    resumed: true
+  });
+
   // stdout をコールバックに流す
   proc.stdout.on('data', (data) => {
     if (onData) {
@@ -209,7 +273,20 @@ function sendToSession(sessionId, prompt, allowedTools, onData, onError, onExit)
     }
   });
 
-  console.log(`[sender] Sent to existing session: sessionId=${sessionId}, pid=${pid}`);
+  // プロセス起動エラー
+  proc.on('error', (err) => {
+    console.error(`[sender] Failed to send to session: ${err.message}`);
+
+    // session-error イベント発行
+    processEvents.emit('session-error', {
+      sessionId,
+      pid,
+      timestamp: new Date().toISOString(),
+      error: err.message
+    });
+
+    managedProcesses.delete(sessionId);
+  });
 
   return { pid, sessionId };
 }
