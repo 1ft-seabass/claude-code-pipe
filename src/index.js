@@ -20,6 +20,33 @@ const { cancel } = require('./canceller');
 const app = express();
 app.use(express.json());
 
+// API トークン認証ミドルウェア
+function authMiddleware(req, res, next) {
+  const apiToken = config.apiToken;
+
+  // トークンが設定されていない、または空文字列の場合は認証をスキップ
+  if (!apiToken || apiToken === '') {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header' });
+  }
+
+  const token = authHeader.substring(7); // "Bearer " を除去
+
+  if (token !== apiToken) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+
+  next();
+}
+
+// 全エンドポイントに認証を適用
+app.use(authMiddleware);
+
 // HTTP サーバーを作成（Express と ws の相乗り用）
 const server = http.createServer(app);
 
