@@ -3,20 +3,11 @@
   "port": 3100,
   "subscribers": [
     {
-      "url": "http://localhost:1880/claude-event",
-      "label": "node-red",
-      "level": "summary",
+      "url": "http://localhost:1880/ccpipe/webhook",
+      "label": "tester-node-red",
+      "level": "basic",
+      "includeMessage": true,
       "authorization": ""
-    },
-    {
-      "url": "http://localhost:1880/claude-status",
-      "label": "led-trigger",
-      "level": "status"
-    },
-    {
-      "url": "http://localhost:3200/claude-stream",
-      "label": "dashboard",
-      "level": "stream-status"
     }
   ],
   "send": {

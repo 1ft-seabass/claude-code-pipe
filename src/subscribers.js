@@ -26,16 +26,13 @@ function setupSubscribers(subscribers, watcher, processEvents) {
     return;
   }
 
-  // セッションごとの状態管理（stream-status 用）
-  const sessionStates = new Map();
-
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
 
   // watcher の message イベントを監視
   watcher.on('message', (event) => {
     for (const subscriber of subscribers) {
-      handleSubscriberEvent(subscriber, event, sessionStates, sessionTimestamps);
+      handleSubscriberEvent(subscriber, event, sessionTimestamps);
     }
   });
 
@@ -81,8 +78,12 @@ function setupSubscribers(subscribers, watcher, processEvents) {
 function handleProcessEvent(subscriber, eventType, event) {
   const { url, label, level, authorization } = subscriber;
 
-  // レベルに応じて処理（status, summary, stream, stream-status すべてに送信）
-  if (level === 'status' || level === 'summary' || level === 'stream' || level === 'stream-status') {
+  // basic: 最低限のイベントのみ (session-started, process-exit)
+  // full: 全イベント (session-started, session-error, session-timeout, cancel-initiated, process-exit)
+  const basicEvents = ['session-started', 'process-exit'];
+  const shouldSend = level === 'full' || (level === 'basic' && basicEvents.includes(eventType));
+
+  if (shouldSend) {
     const payload = {
       type: eventType,
       sessionId: event.sessionId,
@@ -100,103 +101,42 @@ function handleProcessEvent(subscriber, eventType, event) {
 /**
  * subscriber ごとにイベントを処理
  */
-function handleSubscriberEvent(subscriber, event, sessionStates, sessionTimestamps) {
-  const { url, label, level, authorization } = subscriber;
+function handleSubscriberEvent(subscriber, event, sessionTimestamps) {
+  const { url, label, level, includeMessage, authorization } = subscriber;
 
-  // レベルに応じて処理を分岐
-  switch (level) {
-    case 'status':
-      // 応答完了時に1回送信（role: assistant の場合）
-      if (event.message && event.message.role === 'assistant') {
-        const payload = {
-          sessionId: event.sessionId,
-          timestamp: event.timestamp,
-          status: 'completed'
-        };
-        postToSubscriber(url, payload, authorization, label);
-      }
-      break;
-
-    case 'summary':
-      // 応答完了時に1回送信（role: assistant の場合）
-      if (event.message && event.message.role === 'assistant') {
-        // 応答時間を計算
-        let responseTime = null;
-        const lastTimestamp = sessionTimestamps.get(event.sessionId);
-        if (lastTimestamp && event.timestamp) {
-          const diff = new Date(event.timestamp) - new Date(lastTimestamp);
-          responseTime = parseFloat((diff / 1000).toFixed(2)); // 秒単位（数値型）
-        }
-        sessionTimestamps.set(event.sessionId, event.timestamp);
-
-        // source を判定（API経由かどうか）
-        const source = managedProcesses.has(event.sessionId) ? 'api' : 'cli';
-
-        const payload = {
-          sessionId: event.sessionId,
-          timestamp: event.timestamp,
-          status: 'completed',
-          source: source,
-          tools: event.tools || [],
-          responseTime: responseTime,
-          lastMessage: event.message
-        };
-        postToSubscriber(url, payload, authorization, label);
-      }
-      break;
-
-    case 'stream':
-      // メッセージごとに送信（頻繁）
-      postToSubscriber(url, event, authorization, label);
-      break;
-
-    case 'stream-status':
-      // 状態変化ごとに送信
-      handleStreamStatus(event, sessionStates, url, authorization, label);
-      break;
-
-    default:
-      console.warn(`[subscribers] Unknown level: ${level} for subscriber: ${label}`);
-  }
-}
-
-/**
- * stream-status レベルの処理（状態変化時のみ送信）
- */
-function handleStreamStatus(event, sessionStates, url, authorization, label) {
-  const sessionId = event.sessionId;
-  const currentState = sessionStates.get(sessionId) || { status: null, lastMessage: null };
-
-  // 状態が変化したか判定
-  let statusChanged = false;
-
+  // assistant メッセージの場合のみ処理
   if (event.message && event.message.role === 'assistant') {
-    // assistant メッセージが来た = 応答完了
-    if (currentState.status !== 'completed') {
-      statusChanged = true;
-      currentState.status = 'completed';
-      currentState.lastMessage = event.message;
+    // 応答時間を計算
+    let responseTime = null;
+    const lastTimestamp = sessionTimestamps.get(event.sessionId);
+    if (lastTimestamp && event.timestamp) {
+      const diff = new Date(event.timestamp) - new Date(lastTimestamp);
+      responseTime = parseFloat((diff / 1000).toFixed(2)); // 秒単位（数値型）
     }
-  } else if (event.message && event.message.role === 'user') {
-    // user メッセージが来た = 新しいリクエスト
-    if (currentState.status !== 'processing') {
-      statusChanged = true;
-      currentState.status = 'processing';
-      currentState.lastMessage = event.message;
-    }
-  }
+    sessionTimestamps.set(event.sessionId, event.timestamp);
 
-  if (statusChanged) {
+    // source を判定（API経由かどうか）
+    const source = managedProcesses.has(event.sessionId) ? 'api' : 'cli';
+
+    // 基本ペイロード（メタ情報）
     const payload = {
-      sessionId,
+      type: 'assistant-response-completed',
+      sessionId: event.sessionId,
       timestamp: event.timestamp,
-      status: currentState.status,
-      lastMessage: currentState.lastMessage
+      source: source,
+      tools: event.tools || [],
+      responseTime: responseTime
     };
+
+    // includeMessage が true の場合、message を追加
+    if (includeMessage) {
+      payload.message = event.message;
+    }
+
     postToSubscriber(url, payload, authorization, label);
-    sessionStates.set(sessionId, currentState);
   }
 }
+
 
 /**
  * HTTP POST でデータを送信
