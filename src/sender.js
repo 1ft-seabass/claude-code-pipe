@@ -322,5 +322,6 @@ module.exports = {
   sendToSession,
   getManagedProcesses,
   getManagedProcess,
-  processEvents
+  processEvents,
+  managedProcesses  // セッション判定用に公開
 };

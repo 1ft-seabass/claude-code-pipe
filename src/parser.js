@@ -24,7 +24,8 @@ function parseLine(jsonString) {
       sessionId: data.sessionId || null,
       uuid: data.uuid || null,
       timestamp: data.timestamp || null,
-      message: {}
+      message: {},
+      tools: []  // 使用ツール一覧
     };
 
     // message フィールドの抽出
@@ -40,6 +41,14 @@ function parseLine(jsonString) {
           cache_creation_input_tokens: data.message.usage.cache_creation_input_tokens || 0,
           cache_read_input_tokens: data.message.usage.cache_read_input_tokens || 0
         };
+      }
+
+      // content から tool_use を抽出してツール名を収集
+      if (Array.isArray(data.message.content)) {
+        const toolNames = data.message.content
+          .filter(item => item.type === 'tool_use')
+          .map(item => item.name);
+        event.tools = toolNames;
       }
     }
 

@@ -8,6 +8,7 @@
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
+const { managedProcesses } = require('./sender');
 
 // エラー履歴管理（直近のエラーを記録して重複警告を防ぐ）
 const errorHistory = new Map(); // key: `${label}:${url}`, value: timestamp
@@ -28,10 +29,13 @@ function setupSubscribers(subscribers, watcher, processEvents) {
   // セッションごとの状態管理（stream-status 用）
   const sessionStates = new Map();
 
+  // セッションごとの最終タイムスタンプ（応答時間計算用）
+  const sessionTimestamps = new Map();
+
   // watcher の message イベントを監視
   watcher.on('message', (event) => {
     for (const subscriber of subscribers) {
-      handleSubscriberEvent(subscriber, event, sessionStates);
+      handleSubscriberEvent(subscriber, event, sessionStates, sessionTimestamps);
     }
   });
 
@@ -96,7 +100,7 @@ function handleProcessEvent(subscriber, eventType, event) {
 /**
  * subscriber ごとにイベントを処理
  */
-function handleSubscriberEvent(subscriber, event, sessionStates) {
+function handleSubscriberEvent(subscriber, event, sessionStates, sessionTimestamps) {
   const { url, label, level, authorization } = subscriber;
 
   // レベルに応じて処理を分岐
@@ -116,10 +120,25 @@ function handleSubscriberEvent(subscriber, event, sessionStates) {
     case 'summary':
       // 応答完了時に1回送信（role: assistant の場合）
       if (event.message && event.message.role === 'assistant') {
+        // 応答時間を計算
+        let responseTime = null;
+        const lastTimestamp = sessionTimestamps.get(event.sessionId);
+        if (lastTimestamp && event.timestamp) {
+          const diff = new Date(event.timestamp) - new Date(lastTimestamp);
+          responseTime = parseFloat((diff / 1000).toFixed(2)); // 秒単位（数値型）
+        }
+        sessionTimestamps.set(event.sessionId, event.timestamp);
+
+        // source を判定（API経由かどうか）
+        const source = managedProcesses.has(event.sessionId) ? 'api' : 'cli';
+
         const payload = {
           sessionId: event.sessionId,
           timestamp: event.timestamp,
           status: 'completed',
+          source: source,
+          tools: event.tools || [],
+          responseTime: responseTime,
           lastMessage: event.message
         };
         postToSubscriber(url, payload, authorization, label);
