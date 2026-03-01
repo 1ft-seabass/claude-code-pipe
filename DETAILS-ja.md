@@ -188,9 +188,15 @@ curl -H "Authorization: Bearer your-secret-token" \
 
 #### `GET /sessions`
 
-利用可能な全セッションをリスト表示します。
+利用可能な全セッションをメタデータ付きでリスト表示します。
 
-**リクエスト:**
+**クエリパラメータ:**
+
+| パラメータ | 型 | 必須 | デフォルト | 説明 |
+|-----------|------|----------|---------|-------------|
+| `detail` | boolean | No | `false` | 文字列ではなく詳細なメッセージオブジェクトを含める |
+
+**シンプル版（デフォルト）:**
 
 ```bash
 curl http://localhost:3100/sessions
@@ -200,9 +206,94 @@ curl http://localhost:3100/sessions
 
 ```json
 {
-  "sessions": ["session-id-1", "session-id-2", "agent-abc123"]
+  "sessions": [
+    {
+      "id": "01234567-89ab-cdef-0123-456789abcdef",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "lastModifiedAt": "2026-03-01T10:30:00.000Z",
+      "messageCount": 12,
+      "userMessageCount": 6,
+      "assistantMessageCount": 6,
+      "totalTokens": 15000,
+      "firstUserMessage": "プロジェクトの構造を教えて",
+      "lastUserMessage": "ありがとう",
+      "firstAssistantMessage": "プロジェクト構造を確認します...",
+      "lastAssistantMessage": "どういたしまして!"
+    }
+  ]
 }
 ```
+
+**詳細版:**
+
+```bash
+curl http://localhost:3100/sessions?detail=true
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessions": [
+    {
+      "id": "01234567-89ab-cdef-0123-456789abcdef",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "lastModifiedAt": "2026-03-01T10:30:00.000Z",
+      "messageCount": 12,
+      "userMessageCount": 6,
+      "assistantMessageCount": 6,
+      "totalTokens": 15000,
+      "firstUserMessage": {
+        "content": "プロジェクトの構造を教えて",
+        "timestamp": "2026-03-01T10:00:00.000Z"
+      },
+      "lastUserMessage": {
+        "content": "ありがとう",
+        "timestamp": "2026-03-01T10:28:00.000Z"
+      },
+      "firstAssistantMessage": {
+        "content": "プロジェクト構造を確認します...",
+        "timestamp": "2026-03-01T10:00:05.000Z",
+        "usage": {
+          "input_tokens": 100,
+          "output_tokens": 50
+        }
+      },
+      "lastAssistantMessage": {
+        "content": "どういたしまして!",
+        "timestamp": "2026-03-01T10:30:00.000Z",
+        "usage": {
+          "input_tokens": 200,
+          "output_tokens": 30
+        }
+      }
+    }
+  ]
+}
+```
+
+**メタデータフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `id` | string | セッション ID |
+| `createdAt` | string | 最初のメッセージの ISO 8601 タイムスタンプ |
+| `lastModifiedAt` | string | 最後のメッセージの ISO 8601 タイムスタンプ |
+| `messageCount` | number | 総メッセージ数（ユーザー + アシスタント） |
+| `userMessageCount` | number | ユーザーメッセージ数 |
+| `assistantMessageCount` | number | アシスタントメッセージ数 |
+| `totalTokens` | number | 総使用トークン数（入力 + 出力） |
+| `firstUserMessage` | string/object | 最初のユーザーメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
+| `lastUserMessage` | string/object | 最後のユーザーメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
+| `firstAssistantMessage` | string/object | 最初のアシスタントメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
+| `lastAssistantMessage` | string/object | 最後のアシスタントメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
+
+**注意:**
+
+- シンプル版はUIでの素早い表示のためメッセージ内容を文字列として返します
+- 詳細版はタイムスタンプと使用データを含む完全なメッセージオブジェクトを含みます
+- パフォーマンスのため、結果はファイル変更時刻（mtime）を使ってメモリにキャッシュされます
+- セッションファイルが変更されるとキャッシュは自動的に無効化されます
 
 #### `GET /sessions/:id/messages`
 

@@ -188,9 +188,15 @@ If `apiToken` is not set or empty, authentication is disabled (not recommended f
 
 #### `GET /sessions`
 
-List all available sessions.
+List all available sessions with metadata.
 
-**Request:**
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `detail` | boolean | No | `false` | Include detailed message objects instead of strings |
+
+**Simple Version (default):**
 
 ```bash
 curl http://localhost:3100/sessions
@@ -200,9 +206,94 @@ curl http://localhost:3100/sessions
 
 ```json
 {
-  "sessions": ["session-id-1", "session-id-2", "agent-abc123"]
+  "sessions": [
+    {
+      "id": "01234567-89ab-cdef-0123-456789abcdef",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "lastModifiedAt": "2026-03-01T10:30:00.000Z",
+      "messageCount": 12,
+      "userMessageCount": 6,
+      "assistantMessageCount": 6,
+      "totalTokens": 15000,
+      "firstUserMessage": "What is the project structure?",
+      "lastUserMessage": "Thank you",
+      "firstAssistantMessage": "Let me check the project structure...",
+      "lastAssistantMessage": "You're welcome!"
+    }
+  ]
 }
 ```
+
+**Detailed Version:**
+
+```bash
+curl http://localhost:3100/sessions?detail=true
+```
+
+**Response:**
+
+```json
+{
+  "sessions": [
+    {
+      "id": "01234567-89ab-cdef-0123-456789abcdef",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "lastModifiedAt": "2026-03-01T10:30:00.000Z",
+      "messageCount": 12,
+      "userMessageCount": 6,
+      "assistantMessageCount": 6,
+      "totalTokens": 15000,
+      "firstUserMessage": {
+        "content": "What is the project structure?",
+        "timestamp": "2026-03-01T10:00:00.000Z"
+      },
+      "lastUserMessage": {
+        "content": "Thank you",
+        "timestamp": "2026-03-01T10:28:00.000Z"
+      },
+      "firstAssistantMessage": {
+        "content": "Let me check the project structure...",
+        "timestamp": "2026-03-01T10:00:05.000Z",
+        "usage": {
+          "input_tokens": 100,
+          "output_tokens": 50
+        }
+      },
+      "lastAssistantMessage": {
+        "content": "You're welcome!",
+        "timestamp": "2026-03-01T10:30:00.000Z",
+        "usage": {
+          "input_tokens": 200,
+          "output_tokens": 30
+        }
+      }
+    }
+  ]
+}
+```
+
+**Metadata Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Session ID |
+| `createdAt` | string | ISO 8601 timestamp of first message |
+| `lastModifiedAt` | string | ISO 8601 timestamp of last message |
+| `messageCount` | number | Total number of messages (user + assistant) |
+| `userMessageCount` | number | Number of user messages |
+| `assistantMessageCount` | number | Number of assistant messages |
+| `totalTokens` | number | Total tokens used (input + output) |
+| `firstUserMessage` | string/object | First user message (string in simple version, object in detailed version) |
+| `lastUserMessage` | string/object | Last user message (string in simple version, object in detailed version) |
+| `firstAssistantMessage` | string/object | First assistant message (string in simple version, object in detailed version) |
+| `lastAssistantMessage` | string/object | Last assistant message (string in simple version, object in detailed version) |
+
+**Notes:**
+
+- The simple version returns message content as strings for quick UI display
+- The detailed version includes full message objects with timestamps and usage data
+- Results are cached in memory using file modification time (mtime) for performance
+- Cache is automatically invalidated when session files are modified
 
 #### `GET /sessions/:id/messages`
 
