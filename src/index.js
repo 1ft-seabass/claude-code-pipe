@@ -83,7 +83,7 @@ app.use('/', apiRouter);
 setupWebSocket(server, watcher);
 
 // subscribers をセットアップ
-setupSubscribers(config.subscribers, watcher, processEvents);
+setupSubscribers(config.subscribers, watcher, processEvents, config);
 
 // watcher のイベントをログに記録
 watcher.on('message', (event) => {

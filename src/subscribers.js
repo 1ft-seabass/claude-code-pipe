@@ -8,6 +8,7 @@
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
+const path = require('path');
 const { managedProcesses } = require('./sender');
 
 // エラー履歴管理（直近のエラーを記録して重複警告を防ぐ）
@@ -19,12 +20,20 @@ const ERROR_THROTTLE_MS = 5 * 60 * 1000; // 5分間同じエラーを抑制
  * @param {Array} subscribers - config.subscribers の配列
  * @param {JSONLWatcher} watcher - JSONL ウォッチャー
  * @param {EventEmitter} processEvents - sender の processEvents
+ * @param {Object} config - 設定オブジェクト（projectName 取得用）
  */
-function setupSubscribers(subscribers, watcher, processEvents) {
+function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   if (!subscribers || subscribers.length === 0) {
     console.log('[subscribers] No subscribers configured');
     return;
   }
+
+  // プロジェクト情報を取得
+  const cwd = process.cwd();
+  const dirName = path.basename(cwd);
+  const projectName = config.projectName || null;
+
+  const projectInfo = { cwd, dirName, projectName };
 
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
@@ -32,7 +41,7 @@ function setupSubscribers(subscribers, watcher, processEvents) {
   // watcher の message イベントを監視
   watcher.on('message', (event) => {
     for (const subscriber of subscribers) {
-      handleSubscriberEvent(subscriber, event, sessionTimestamps);
+      handleSubscriberEvent(subscriber, event, sessionTimestamps, projectInfo);
     }
   });
 
@@ -40,31 +49,31 @@ function setupSubscribers(subscribers, watcher, processEvents) {
   if (processEvents) {
     processEvents.on('session-started', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-started', event);
+        handleProcessEvent(subscriber, 'session-started', event, projectInfo);
       }
     });
 
     processEvents.on('session-error', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-error', event);
+        handleProcessEvent(subscriber, 'session-error', event, projectInfo);
       }
     });
 
     processEvents.on('session-timeout', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-timeout', event);
+        handleProcessEvent(subscriber, 'session-timeout', event, projectInfo);
       }
     });
 
     processEvents.on('cancel-initiated', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'cancel-initiated', event);
+        handleProcessEvent(subscriber, 'cancel-initiated', event, projectInfo);
       }
     });
 
     processEvents.on('process-exit', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'process-exit', event);
+        handleProcessEvent(subscriber, 'process-exit', event, projectInfo);
       }
     });
   }
@@ -75,7 +84,7 @@ function setupSubscribers(subscribers, watcher, processEvents) {
 /**
  * プロセスイベントを処理（キャンセル、終了など）
  */
-function handleProcessEvent(subscriber, eventType, event) {
+function handleProcessEvent(subscriber, eventType, event, projectInfo) {
   const { url, label, level, authorization } = subscriber;
 
   // basic: 最低限のイベントのみ (session-started, process-exit)
@@ -89,6 +98,9 @@ function handleProcessEvent(subscriber, eventType, event) {
       sessionId: event.sessionId,
       pid: event.pid,
       timestamp: event.timestamp,
+      cwd: projectInfo.cwd,
+      dirName: projectInfo.dirName,
+      ...(projectInfo.projectName && { projectName: projectInfo.projectName }),
       ...(event.code !== undefined && { code: event.code }),
       ...(event.signal !== undefined && { signal: event.signal }),
       ...(event.error !== undefined && { error: event.error }),
@@ -101,7 +113,7 @@ function handleProcessEvent(subscriber, eventType, event) {
 /**
  * subscriber ごとにイベントを処理
  */
-function handleSubscriberEvent(subscriber, event, sessionTimestamps) {
+function handleSubscriberEvent(subscriber, event, sessionTimestamps, projectInfo) {
   const { url, label, level, includeMessage, authorization } = subscriber;
 
   // assistant メッセージの場合のみ処理
@@ -123,6 +135,9 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps) {
       type: 'assistant-response-completed',
       sessionId: event.sessionId,
       timestamp: event.timestamp,
+      cwd: projectInfo.cwd,
+      dirName: projectInfo.dirName,
+      ...(projectInfo.projectName && { projectName: projectInfo.projectName }),
       source: source,
       tools: event.tools || [],
       responseTime: responseTime

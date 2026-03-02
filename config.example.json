@@ -2,6 +2,7 @@
   "watchDir": "~/.claude/projects",
   "port": 3100,
   "apiToken": "",
+  "projectName": "",
   "subscribers": [
     {
       "url": "http://localhost:1880/claude-event",
