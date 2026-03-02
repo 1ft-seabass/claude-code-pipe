@@ -155,10 +155,19 @@ function createApiRouter(watchDir) {
     try {
       const sessions = await getSessionFiles();
 
+      // クエリパラメータからフィルタ条件を取得（デフォルト: agent セッションと空セッションを除外）
+      const excludeAgents = req.query.excludeAgents !== 'false'; // デフォルト true
+      const excludeEmpty = req.query.excludeEmpty !== 'false';   // デフォルト true
+
       // プロジェクトごとにグルーピング
       const projectsMap = new Map();
 
       for (const session of sessions) {
+        // agent-* セッションを除外（オプション）
+        if (excludeAgents && session.id.startsWith('agent-')) {
+          continue;
+        }
+
         const projectPath = extractProjectPath(session.path);
         const projectName = projectPath ? path.basename(projectPath) : null;
 
@@ -181,6 +190,33 @@ function createApiRouter(watchDir) {
         });
       }
 
+      // excludeEmpty が有効な場合、空セッションを除外
+      if (excludeEmpty) {
+        for (const [projectPath, project] of projectsMap.entries()) {
+          // 各セッションのメタデータを取得してフィルタ
+          const filteredSessions = [];
+          for (const session of project.sessions) {
+            const sessionFiles = await getSessionFiles();
+            const sessionFile = sessionFiles.find(s => s.id === session.id);
+            if (sessionFile) {
+              const metadata = await getSessionMetadata(session.id, sessionFile.path, sessionFile.mtime);
+              if (metadata.messageCount > 0) {
+                filteredSessions.push(session);
+              }
+            }
+          }
+          project.sessions = filteredSessions;
+          project.sessionCount = filteredSessions.length;
+        }
+
+        // セッション数が0のプロジェクトを削除
+        for (const [projectPath, project] of projectsMap.entries()) {
+          if (project.sessionCount === 0) {
+            projectsMap.delete(projectPath);
+          }
+        }
+      }
+
       // Map を配列に変換
       const projects = Array.from(projectsMap.values());
 
@@ -200,17 +236,35 @@ function createApiRouter(watchDir) {
       const sessions = await getSessionFiles();
       const detail = req.query.detail === 'true';
 
+      // クエリパラメータからフィルタ条件を取得（デフォルト: agent セッションと空セッションを除外）
+      const excludeAgents = req.query.excludeAgents !== 'false'; // デフォルト true
+      const excludeEmpty = req.query.excludeEmpty !== 'false';   // デフォルト true
+
+      // フィルタリング適用
+      let filteredSessions = sessions;
+
+      // agent-* セッションを除外（オプション）
+      if (excludeAgents) {
+        filteredSessions = filteredSessions.filter(s => !s.id.startsWith('agent-'));
+      }
+
       if (!detail) {
         // シンプル版: メタデータのみ
-        const metadataList = await Promise.all(
-          sessions.map(s => getSessionMetadata(s.id, s.path, s.mtime))
+        let metadataList = await Promise.all(
+          filteredSessions.map(s => getSessionMetadata(s.id, s.path, s.mtime))
         );
+
+        // 空セッションを除外（オプション）
+        if (excludeEmpty) {
+          metadataList = metadataList.filter(m => m.messageCount > 0);
+        }
+
         return res.json({ sessions: metadataList });
       }
 
       // 詳細版: メッセージオブジェクト全体を含む
       const detailedList = await Promise.all(
-        sessions.map(async (s) => {
+        filteredSessions.map(async (s) => {
           const events = await parseJSONLFile(s.path);
           const userMessages = events.filter(e => e.message && e.message.role === 'user');
           const assistantMessages = events.filter(e => e.message && e.message.role === 'assistant');
@@ -268,7 +322,12 @@ function createApiRouter(watchDir) {
         })
       );
 
-      res.json({ sessions: detailedList });
+      // 空セッションを除外（オプション）
+      const finalList = excludeEmpty
+        ? detailedList.filter(s => s.messageCount > 0)
+        : detailedList;
+
+      res.json({ sessions: finalList });
     } catch (error) {
       console.error('[api] Error getting sessions:', error);
       res.status(500).json({ error: 'Failed to get sessions' });
