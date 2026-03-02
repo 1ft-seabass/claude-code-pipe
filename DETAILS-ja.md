@@ -196,11 +196,26 @@ curl -H "Authorization: Bearer your-secret-token" \
 | パラメータ | 型 | 必須 | デフォルト | 説明 |
 |-----------|------|----------|---------|-------------|
 | `detail` | boolean | No | `false` | 文字列ではなく詳細なメッセージオブジェクトを含める |
+| `excludeAgents` | boolean | No | `true` | `agent-*` セッション（Claude Code 内部エージェント）を除外 |
+| `excludeEmpty` | boolean | No | `true` | メッセージがないセッション（`messageCount === 0`）を除外 |
 
 **シンプル版（デフォルト）:**
 
 ```bash
 curl http://localhost:3100/sessions
+```
+
+**フィルタ付き:**
+
+```bash
+# agent-* セッションと空セッションを含めてすべて表示
+curl "http://localhost:3100/sessions?excludeAgents=false&excludeEmpty=false"
+
+# agent-* セッションのみ除外
+curl "http://localhost:3100/sessions?excludeEmpty=false"
+
+# 空セッションのみ除外
+curl "http://localhost:3100/sessions?excludeAgents=false"
 ```
 
 **レスポンス:**
@@ -559,10 +574,30 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 
 全プロジェクトとそのセッションをリスト表示します。
 
+**クエリパラメータ:**
+
+| パラメータ | 型 | 必須 | デフォルト | 説明 |
+|-----------|------|----------|---------|-------------|
+| `excludeAgents` | boolean | No | `true` | `agent-*` セッション（Claude Code 内部エージェント）を除外 |
+| `excludeEmpty` | boolean | No | `true` | メッセージがないセッション（`messageCount === 0`）を除外 |
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/projects
+```
+
+**フィルタ付き:**
+
+```bash
+# agent-* セッションと空セッションを含めてすべて表示
+curl "http://localhost:3100/projects?excludeAgents=false&excludeEmpty=false"
+
+# agent-* セッションのみ除外
+curl "http://localhost:3100/projects?excludeEmpty=false"
+
+# 空セッションのみ除外
+curl "http://localhost:3100/projects?excludeAgents=false"
 ```
 
 **レスポンス:**
@@ -591,13 +626,15 @@ curl http://localhost:3100/projects
 |-------|------|-------------|
 | `projectPath` | string | プロジェクトディレクトリのフルパス |
 | `projectName` | string | プロジェクトディレクトリ名 |
-| `sessionCount` | number | このプロジェクトのセッション数 |
-| `sessions` | array | セッションオブジェクトの配列（id, mtime） |
+| `sessionCount` | number | このプロジェクトのセッション数（フィルタ適用後） |
+| `sessions` | array | セッションオブジェクトの配列（id, mtime）（フィルタ適用後） |
 
 **注意:**
 
 - プロジェクトはセッション数の降順でソートされます
 - Webhook v2 と同じパス抽出ロジックを使用します
+- デフォルトでは `agent-*` セッションと空セッションが除外されます
+- すべてのセッションを表示するには `excludeAgents=false` と `excludeEmpty=false` を設定してください
 
 #### `GET /managed`
 

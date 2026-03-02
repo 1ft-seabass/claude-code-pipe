@@ -196,11 +196,26 @@ List all available sessions with metadata.
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `detail` | boolean | No | `false` | Include detailed message objects instead of strings |
+| `excludeAgents` | boolean | No | `true` | Exclude `agent-*` sessions (internal Claude Code agents) |
+| `excludeEmpty` | boolean | No | `true` | Exclude sessions with no messages (`messageCount === 0`) |
 
 **Simple Version (default):**
 
 ```bash
 curl http://localhost:3100/sessions
+```
+
+**With Filters:**
+
+```bash
+# Show all sessions including agent-* and empty sessions
+curl "http://localhost:3100/sessions?excludeAgents=false&excludeEmpty=false"
+
+# Show only agent-* sessions excluded
+curl "http://localhost:3100/sessions?excludeEmpty=false"
+
+# Show only empty sessions excluded
+curl "http://localhost:3100/sessions?excludeAgents=false"
 ```
 
 **Response:**
@@ -559,10 +574,30 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 
 List all projects with their sessions.
 
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `excludeAgents` | boolean | No | `true` | Exclude `agent-*` sessions (internal Claude Code agents) |
+| `excludeEmpty` | boolean | No | `true` | Exclude sessions with no messages (`messageCount === 0`) |
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/projects
+```
+
+**With Filters:**
+
+```bash
+# Show all sessions including agent-* and empty sessions
+curl "http://localhost:3100/projects?excludeAgents=false&excludeEmpty=false"
+
+# Show only agent-* sessions excluded
+curl "http://localhost:3100/projects?excludeEmpty=false"
+
+# Show only empty sessions excluded
+curl "http://localhost:3100/projects?excludeAgents=false"
 ```
 
 **Response:**
@@ -591,13 +626,15 @@ curl http://localhost:3100/projects
 |-------|------|-------------|
 | `projectPath` | string | Full path to the project directory |
 | `projectName` | string | Project directory name |
-| `sessionCount` | number | Number of sessions in this project |
-| `sessions` | array | Array of session objects (id, mtime) |
+| `sessionCount` | number | Number of sessions in this project (after filters applied) |
+| `sessions` | array | Array of session objects (id, mtime) (after filters applied) |
 
 **Notes:**
 
 - Projects are sorted by session count (descending)
 - Uses the same path extraction logic as Webhook v2
+- By default, `agent-*` sessions and empty sessions are excluded
+- Set `excludeAgents=false` and `excludeEmpty=false` to see all sessions
 
 #### `GET /managed`
 
