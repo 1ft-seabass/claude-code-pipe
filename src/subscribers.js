@@ -302,5 +302,6 @@ function logErrorIfNeeded(message, label, url) {
 }
 
 module.exports = {
-  setupSubscribers
+  setupSubscribers,
+  extractProjectPath
 };

@@ -22,18 +22,23 @@ const SESSION_START_TIMEOUT_MS = 60 * 1000;
  * @param {string} prompt - プロンプトテキスト
  * @param {string} cwd - 作業ディレクトリ
  * @param {Array<string>} allowedTools - 許可ツールのリスト
+ * @param {boolean} dangerouslySkipPermissions - 権限確認をスキップ（危険）
  * @param {Function} onData - stdout データのコールバック
  * @param {Function} onError - stderr データのコールバック
  * @param {Function} onExit - プロセス終了時のコールバック
  * @returns {Promise<object>} { pid, sessionId } (sessionIdは実際のUUID)
  */
-function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
+function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
   return new Promise((resolve, reject) => {
     // claude コマンドの引数を構築
     let claudeArgs = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
 
     if (allowedTools && allowedTools.length > 0) {
       claudeArgs.push('--allowed-tools', allowedTools.join(','));
+    }
+
+    if (dangerouslySkipPermissions) {
+      claudeArgs.push('--dangerously-skip-permissions');
     }
 
     // script コマンドで PTY を提供してバッファリングを回避
@@ -194,18 +199,24 @@ function startNewSession(prompt, cwd, allowedTools, onData, onError, onExit) {
  * 既存セッションに送信
  * @param {string} sessionId - セッションID (UUID形式)
  * @param {string} prompt - プロンプトテキスト
+ * @param {string} cwd - 作業ディレクトリ
  * @param {Array<string>} allowedTools - 許可ツールのリスト
+ * @param {boolean} dangerouslySkipPermissions - 権限確認をスキップ（危険）
  * @param {Function} onData - stdout データのコールバック
  * @param {Function} onError - stderr データのコールバック
  * @param {Function} onExit - プロセス終了時のコールバック
  * @returns {object} { pid, sessionId }
  */
-function sendToSession(sessionId, prompt, allowedTools, onData, onError, onExit) {
+function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
   // claude コマンドの引数を構築
   let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
 
   if (allowedTools && allowedTools.length > 0) {
     claudeArgs.push('--allowed-tools', allowedTools.join(','));
+  }
+
+  if (dangerouslySkipPermissions) {
+    claudeArgs.push('--dangerously-skip-permissions');
   }
 
   // script コマンドで PTY を提供してバッファリングを回避
@@ -218,6 +229,7 @@ function sendToSession(sessionId, prompt, allowedTools, onData, onError, onExit)
   }).join(' ')}`;
 
   const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
+    cwd: cwd || process.cwd(),
     stdio: ['pipe', 'pipe', 'pipe']
   });
 
