@@ -48,6 +48,7 @@ Complete documentation for claude-code-pipe.
 | `watchDir` | string | Yes | - | Directory to watch for Claude Code session files (e.g., `~/.claude/projects`) |
 | `port` | number | Yes | - | Port number for the server (recommended: `3100`) |
 | `apiToken` | string | No | `""` | API token for authentication. If set, all requests must include `Authorization: Bearer TOKEN` header |
+| `projectName` | string | No | `null` | Project name (included in webhook payloads). If not set, webhooks will only include `cwd` and `dirName` |
 | `subscribers` | array | No | `[]` | List of webhook subscribers |
 | `send` | object | No | `{}` | Configuration for send mode |
 
@@ -576,6 +577,9 @@ All events include these metadata fields:
 | `type` | string | Event type (see [Event Types](#event-types)) |
 | `sessionId` | string | Session ID |
 | `timestamp` | string | ISO 8601 timestamp |
+| `cwd` | string | Full path of the working directory |
+| `dirName` | string | Base name of the working directory |
+| `projectName` | string | Project name (optional, only if set in config.json) |
 | `source` | string | Event source: `watcher`, `sender`, or `canceller` |
 
 Additional fields depend on `includeMessage` setting.
@@ -587,10 +591,15 @@ Additional fields depend on `includeMessage` setting.
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
   "source": "watcher",
   "responseTime": 5234
 }
 ```
+
+**Note**: `projectName` is only included if set in `config.json`.
 
 ### Full Event (includeMessage: true)
 
@@ -599,6 +608,9 @@ Additional fields depend on `includeMessage` setting.
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
   "source": "watcher",
   "responseTime": 5234,
   "message": {
@@ -633,6 +645,10 @@ Additional fields depend on `includeMessage` setting.
   "type": "session-started",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:00.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
+  "pid": 12345,
   "source": "sender"
 }
 ```
@@ -644,6 +660,9 @@ Additional fields depend on `includeMessage` setting.
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
   "source": "watcher",
   "responseTime": 5234,
   "message": {
@@ -664,8 +683,12 @@ Additional fields depend on `includeMessage` setting.
   "type": "process-exit",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:05:00.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
+  "pid": 12345,
   "source": "sender",
-  "exitCode": 0
+  "code": 0
 }
 ```
 
@@ -676,6 +699,10 @@ Additional fields depend on `includeMessage` setting.
   "type": "cancel-initiated",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:02:00.000Z",
+  "cwd": "/home/user/projects/my-app",
+  "dirName": "my-app",
+  "projectName": "My Application",
+  "pid": 12345,
   "source": "canceller"
 }
 ```
