@@ -216,6 +216,8 @@ curl http://localhost:3100/sessions
       "userMessageCount": 6,
       "assistantMessageCount": 6,
       "totalTokens": 15000,
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
       "firstUserMessage": "プロジェクトの構造を教えて",
       "lastUserMessage": "ありがとう",
       "firstAssistantMessage": "プロジェクト構造を確認します...",
@@ -244,6 +246,8 @@ curl http://localhost:3100/sessions?detail=true
       "userMessageCount": 6,
       "assistantMessageCount": 6,
       "totalTokens": 15000,
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
       "firstUserMessage": {
         "content": "プロジェクトの構造を教えて",
         "timestamp": "2026-03-01T10:00:00.000Z"
@@ -284,6 +288,8 @@ curl http://localhost:3100/sessions?detail=true
 | `userMessageCount` | number | ユーザーメッセージ数 |
 | `assistantMessageCount` | number | アシスタントメッセージ数 |
 | `totalTokens` | number | 総使用トークン数（入力 + 出力） |
+| `projectPath` | string | プロジェクトディレクトリのフルパス |
+| `projectName` | string | プロジェクトディレクトリ名 |
 | `firstUserMessage` | string/object | 最初のユーザーメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
 | `lastUserMessage` | string/object | 最後のユーザーメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
 | `firstAssistantMessage` | string/object | 最初のアシスタントメッセージ（シンプル版: 文字列、詳細版: オブジェクト） |
@@ -459,7 +465,8 @@ curl -X POST http://localhost:3100/sessions/new \
   -d '{
     "prompt": "ここにプロンプトを入力",
     "cwd": "/path/to/project",
-    "allowedTools": ["Read", "Grep", "Write"]
+    "allowedTools": ["Read", "Grep", "Write"],
+    "dangerouslySkipPermissions": false
   }'
 ```
 
@@ -470,6 +477,7 @@ curl -X POST http://localhost:3100/sessions/new \
 | `prompt` | string | Yes | - | Claude Code に送信するプロンプト |
 | `cwd` | string | No | カレントディレクトリ | セッションの作業ディレクトリ |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
+| `dangerouslySkipPermissions` | boolean | No | `false` | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。 |
 
 **レスポンス:**
 
@@ -489,7 +497,12 @@ curl -X POST http://localhost:3100/sessions/new \
 ```bash
 curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "追加のメッセージ"}'
+  -d '{
+    "prompt": "追加のメッセージ",
+    "cwd": "/path/to/project",
+    "allowedTools": ["Read", "Grep", "Write"],
+    "dangerouslySkipPermissions": false
+  }'
 ```
 
 **リクエストボディ:**
@@ -497,13 +510,18 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | フィールド | 型 | 必須 | 説明 |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | 送信するプロンプト |
+| `cwd` | string | Yes | セッションの作業ディレクトリ |
+| `allowedTools` | array | No | Claude Code で許可するツール |
+| `dangerouslySkipPermissions` | boolean | No | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。 |
 
 **レスポンス:**
 
 ```json
 {
-  "message": "Prompt sent to existing session",
-  "sessionId": "01234567-89ab-cdef-0123-456789abcdef"
+  "success": true,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "pid": 12345,
+  "message": "Message sent successfully"
 }
 ```
 
@@ -536,6 +554,50 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 4. `cancel-initiated` イベントを送信（level: `full`）
 
 ### Management
+
+#### `GET /projects`
+
+全プロジェクトとそのセッションをリスト表示します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/projects
+```
+
+**レスポンス:**
+
+```json
+{
+  "projects": [
+    {
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
+      "sessionCount": 5,
+      "sessions": [
+        {
+          "id": "01234567-89ab-cdef-0123-456789abcdef",
+          "mtime": 1709280000000
+        }
+      ]
+    }
+  ]
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `projectPath` | string | プロジェクトディレクトリのフルパス |
+| `projectName` | string | プロジェクトディレクトリ名 |
+| `sessionCount` | number | このプロジェクトのセッション数 |
+| `sessions` | array | セッションオブジェクトの配列（id, mtime） |
+
+**注意:**
+
+- プロジェクトはセッション数の降順でソートされます
+- Webhook v2 と同じパス抽出ロジックを使用します
 
 #### `GET /managed`
 

@@ -216,6 +216,8 @@ curl http://localhost:3100/sessions
       "userMessageCount": 6,
       "assistantMessageCount": 6,
       "totalTokens": 15000,
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
       "firstUserMessage": "What is the project structure?",
       "lastUserMessage": "Thank you",
       "firstAssistantMessage": "Let me check the project structure...",
@@ -244,6 +246,8 @@ curl http://localhost:3100/sessions?detail=true
       "userMessageCount": 6,
       "assistantMessageCount": 6,
       "totalTokens": 15000,
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
       "firstUserMessage": {
         "content": "What is the project structure?",
         "timestamp": "2026-03-01T10:00:00.000Z"
@@ -284,6 +288,8 @@ curl http://localhost:3100/sessions?detail=true
 | `userMessageCount` | number | Number of user messages |
 | `assistantMessageCount` | number | Number of assistant messages |
 | `totalTokens` | number | Total tokens used (input + output) |
+| `projectPath` | string | Full path to the project directory |
+| `projectName` | string | Project directory name |
 | `firstUserMessage` | string/object | First user message (string in simple version, object in detailed version) |
 | `lastUserMessage` | string/object | Last user message (string in simple version, object in detailed version) |
 | `firstAssistantMessage` | string/object | First assistant message (string in simple version, object in detailed version) |
@@ -459,7 +465,8 @@ curl -X POST http://localhost:3100/sessions/new \
   -d '{
     "prompt": "Your prompt here",
     "cwd": "/path/to/project",
-    "allowedTools": ["Read", "Grep", "Write"]
+    "allowedTools": ["Read", "Grep", "Write"],
+    "dangerouslySkipPermissions": false
   }'
 ```
 
@@ -470,6 +477,7 @@ curl -X POST http://localhost:3100/sessions/new \
 | `prompt` | string | Yes | - | Prompt to send to Claude Code |
 | `cwd` | string | No | current directory | Working directory for the session |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
+| `dangerouslySkipPermissions` | boolean | No | `false` | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. |
 
 **Response:**
 
@@ -489,7 +497,12 @@ Send a prompt to an existing session.
 ```bash
 curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Follow-up message"}'
+  -d '{
+    "prompt": "Follow-up message",
+    "cwd": "/path/to/project",
+    "allowedTools": ["Read", "Grep", "Write"],
+    "dangerouslySkipPermissions": false
+  }'
 ```
 
 **Request Body:**
@@ -497,13 +510,18 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `prompt` | string | Yes | Prompt to send |
+| `cwd` | string | Yes | Working directory for the session |
+| `allowedTools` | array | No | Allowed tools for Claude Code |
+| `dangerouslySkipPermissions` | boolean | No | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. |
 
 **Response:**
 
 ```json
 {
-  "message": "Prompt sent to existing session",
-  "sessionId": "01234567-89ab-cdef-0123-456789abcdef"
+  "success": true,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "pid": 12345,
+  "message": "Message sent successfully"
 }
 ```
 
@@ -536,6 +554,50 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 4. Emits `cancel-initiated` event (level: `full`)
 
 ### Management
+
+#### `GET /projects`
+
+List all projects with their sessions.
+
+**Request:**
+
+```bash
+curl http://localhost:3100/projects
+```
+
+**Response:**
+
+```json
+{
+  "projects": [
+    {
+      "projectPath": "/home/user/workspace/my-app",
+      "projectName": "my-app",
+      "sessionCount": 5,
+      "sessions": [
+        {
+          "id": "01234567-89ab-cdef-0123-456789abcdef",
+          "mtime": 1709280000000
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `projectPath` | string | Full path to the project directory |
+| `projectName` | string | Project directory name |
+| `sessionCount` | number | Number of sessions in this project |
+| `sessions` | array | Array of session objects (id, mtime) |
+
+**Notes:**
+
+- Projects are sorted by session count (descending)
+- Uses the same path extraction logic as Webhook v2
 
 #### `GET /managed`
 
