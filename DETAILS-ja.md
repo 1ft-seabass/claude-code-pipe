@@ -48,7 +48,7 @@ claude-code-pipe の完全なドキュメント
 | `watchDir` | string | Yes | - | Claude Code セッションファイルの監視ディレクトリ（例: `~/.claude/projects`） |
 | `port` | number | Yes | - | サーバーのポート番号（推奨: `3100`） |
 | `apiToken` | string | No | `""` | API 認証トークン。設定すると、全リクエストに `Authorization: Bearer TOKEN` ヘッダーが必要 |
-| `projectName` | string | No | `null` | プロジェクト名（Webhook ペイロードに含まれる）。未設定の場合、Webhook には `cwd` と `dirName` のみが含まれる |
+| `projectTitle` | string | No | `null` | ユーザー定義のプロジェクトタイトル（Webhook ペイロードに `projectTitle` として含まれる） |
 | `subscribers` | array | No | `[]` | Webhook 購読者のリスト |
 | `send` | object | No | `{}` | Send モードの設定 |
 
@@ -577,10 +577,12 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 | `type` | string | イベントタイプ（[イベントタイプ](#イベントタイプ)参照） |
 | `sessionId` | string | セッション ID |
 | `timestamp` | string | ISO 8601 タイムスタンプ |
-| `cwd` | string | 作業ディレクトリのフルパス |
-| `dirName` | string | 作業ディレクトリ名（ディレクトリのベース名） |
-| `projectName` | string | プロジェクト名（config.json で設定した場合のみ、オプション） |
-| `source` | string | イベントソース: `watcher`, `sender`, または `canceller` |
+| `cwdPath` | string | サーバー（claude-code-pipe）の作業ディレクトリのフルパス |
+| `cwdName` | string | サーバーの作業ディレクトリ名（ディレクトリのベース名） |
+| `projectPath` | string | セッションのプロジェクトディレクトリのフルパス（オプション、JSONL パスから抽出） |
+| `projectName` | string | セッションのプロジェクトディレクトリ名（オプション、JSONL パスから抽出） |
+| `projectTitle` | string | ユーザー定義のプロジェクトタイトル（config.json で設定した場合のみ、オプション） |
+| `source` | string | イベントソース: `watcher`, `api`, または `cli` |
 
 追加のフィールドは `includeMessage` 設定に依存します。
 
@@ -591,15 +593,20 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
-  "source": "watcher",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectPath": "/home/user/projects/my-app",
+  "projectName": "my-app",
+  "projectTitle": "My Application",
+  "source": "cli",
+  "tools": [],
   "responseTime": 5234
 }
 ```
 
-**注**: `projectName` は `config.json` で設定した場合のみ含まれます。
+**注**:
+- `projectPath` と `projectName` は JSONL ファイルパスから抽出され、`assistant-response-completed` イベントでのみ利用可能です
+- `projectTitle` は `config.json` で設定した場合のみ含まれます
 
 ### 完全イベント（includeMessage: true）
 
@@ -608,10 +615,13 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
-  "source": "watcher",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectPath": "/home/user/projects/my-app",
+  "projectName": "my-app",
+  "projectTitle": "My Application",
+  "source": "cli",
+  "tools": [],
   "responseTime": 5234,
   "message": {
     "role": "assistant",
@@ -645,9 +655,9 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "session-started",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:00.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender"
 }
@@ -660,10 +670,13 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "assistant-response-completed",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:00:05.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
-  "source": "watcher",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectPath": "/home/user/projects/my-app",
+  "projectName": "my-app",
+  "projectTitle": "My Application",
+  "source": "cli",
+  "tools": [],
   "responseTime": 5234,
   "message": {
     "role": "assistant",
@@ -683,9 +696,9 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "process-exit",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:05:00.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
   "code": 0
@@ -699,9 +712,9 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "type": "cancel-initiated",
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "timestamp": "2026-03-01T12:02:00.000Z",
-  "cwd": "/home/user/projects/my-app",
-  "dirName": "my-app",
-  "projectName": "My Application",
+  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
+  "cwdName": "claude-code-pipe",
+  "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"
 }

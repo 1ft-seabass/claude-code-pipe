@@ -15,12 +15,79 @@ const { managedProcesses } = require('./sender');
 const errorHistory = new Map(); // key: `${label}:${url}`, value: timestamp
 const ERROR_THROTTLE_MS = 5 * 60 * 1000; // 5分間同じエラーを抑制
 
+// プロジェクトパスのキャッシュ（パフォーマンス最適化）
+const projectPathCache = new Map();
+
+/**
+ * JSONL ファイルパスからプロジェクトパスを抽出
+ * @param {string} jsonlFilePath - JSONL ファイルのフルパス
+ * @returns {string|null} - プロジェクトのフルパス、または null
+ *
+ * 例: ~/.claude/projects/-home-node-workspace-repos-my-app/session-id.jsonl
+ * → /home/node/workspace/repos/my-app
+ *
+ * 注: Claude は "/" を "-" に変換してエンコードするため、元のパスに "-" が
+ * 含まれる場合は正確に復元できない。そのため、実際に存在するパスを探す。
+ * 一度解決したパスはキャッシュして再利用する。
+ */
+function extractProjectPath(jsonlFilePath) {
+  const fs = require('fs');
+
+  try {
+    const dir = path.dirname(jsonlFilePath);
+    const projectDirName = path.basename(dir);
+
+    // ディレクトリ名が "-" で始まる場合、エンコードされたパスと判断
+    if (!projectDirName.startsWith('-')) {
+      return null;
+    }
+
+    // キャッシュをチェック
+    if (projectPathCache.has(projectDirName)) {
+      return projectPathCache.get(projectDirName);
+    }
+
+    // 先頭の "-" を削除
+    const encoded = projectDirName.substring(1);
+
+    // まず、最も一般的なパターン（深さ3-5のパス）を試す
+    // 例: /home/user/project, /home/user/workspace/project など
+    const commonDepths = [3, 4, 5, 2, 6];
+
+    for (const depth of commonDepths) {
+      const parts = encoded.split('-');
+      if (parts.length >= depth) {
+        const candidatePath = '/' + parts.slice(0, depth).join('/') +
+                             (parts.length > depth ? '-' + parts.slice(depth).join('-') : '');
+
+        try {
+          if (fs.existsSync(candidatePath)) {
+            projectPathCache.set(projectDirName, candidatePath);
+            return candidatePath;
+          }
+        } catch (e) {
+          // 無視
+        }
+      }
+    }
+
+    // 見つからない場合は、全ての "-" を "/" に変換したパスを試す
+    const fullPath = '/' + encoded.replace(/-/g, '/');
+    projectPathCache.set(projectDirName, fullPath);
+    return fullPath;
+
+  } catch (error) {
+    console.error('[subscribers] Failed to extract project path:', error.message);
+    return null;
+  }
+}
+
 /**
  * subscribers の配信をセットアップ
  * @param {Array} subscribers - config.subscribers の配列
  * @param {JSONLWatcher} watcher - JSONL ウォッチャー
  * @param {EventEmitter} processEvents - sender の processEvents
- * @param {Object} config - 設定オブジェクト（projectName 取得用）
+ * @param {Object} config - 設定オブジェクト（projectTitle 取得用）
  */
 function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   if (!subscribers || subscribers.length === 0) {
@@ -28,12 +95,12 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
     return;
   }
 
-  // プロジェクト情報を取得
-  const cwd = process.cwd();
-  const dirName = path.basename(cwd);
-  const projectName = config.projectName || null;
+  // サーバー情報を取得
+  const cwdPath = process.cwd();
+  const cwdName = path.basename(cwdPath);
+  const projectTitle = config.projectTitle || null;
 
-  const projectInfo = { cwd, dirName, projectName };
+  const serverInfo = { cwdPath, cwdName, projectTitle };
 
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
@@ -41,7 +108,7 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   // watcher の message イベントを監視
   watcher.on('message', (event) => {
     for (const subscriber of subscribers) {
-      handleSubscriberEvent(subscriber, event, sessionTimestamps, projectInfo);
+      handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo);
     }
   });
 
@@ -49,31 +116,31 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   if (processEvents) {
     processEvents.on('session-started', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-started', event, projectInfo);
+        handleProcessEvent(subscriber, 'session-started', event, serverInfo);
       }
     });
 
     processEvents.on('session-error', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-error', event, projectInfo);
+        handleProcessEvent(subscriber, 'session-error', event, serverInfo);
       }
     });
 
     processEvents.on('session-timeout', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'session-timeout', event, projectInfo);
+        handleProcessEvent(subscriber, 'session-timeout', event, serverInfo);
       }
     });
 
     processEvents.on('cancel-initiated', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'cancel-initiated', event, projectInfo);
+        handleProcessEvent(subscriber, 'cancel-initiated', event, serverInfo);
       }
     });
 
     processEvents.on('process-exit', (event) => {
       for (const subscriber of subscribers) {
-        handleProcessEvent(subscriber, 'process-exit', event, projectInfo);
+        handleProcessEvent(subscriber, 'process-exit', event, serverInfo);
       }
     });
   }
@@ -84,7 +151,7 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
 /**
  * プロセスイベントを処理（キャンセル、終了など）
  */
-function handleProcessEvent(subscriber, eventType, event, projectInfo) {
+function handleProcessEvent(subscriber, eventType, event, serverInfo) {
   const { url, label, level, authorization } = subscriber;
 
   // basic: 最低限のイベントのみ (session-started, process-exit)
@@ -98,9 +165,9 @@ function handleProcessEvent(subscriber, eventType, event, projectInfo) {
       sessionId: event.sessionId,
       pid: event.pid,
       timestamp: event.timestamp,
-      cwd: projectInfo.cwd,
-      dirName: projectInfo.dirName,
-      ...(projectInfo.projectName && { projectName: projectInfo.projectName }),
+      cwdPath: serverInfo.cwdPath,
+      cwdName: serverInfo.cwdName,
+      ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       ...(event.code !== undefined && { code: event.code }),
       ...(event.signal !== undefined && { signal: event.signal }),
       ...(event.error !== undefined && { error: event.error }),
@@ -113,7 +180,7 @@ function handleProcessEvent(subscriber, eventType, event, projectInfo) {
 /**
  * subscriber ごとにイベントを処理
  */
-function handleSubscriberEvent(subscriber, event, sessionTimestamps, projectInfo) {
+function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo) {
   const { url, label, level, includeMessage, authorization } = subscriber;
 
   // assistant メッセージの場合のみ処理
@@ -130,14 +197,20 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, projectInfo
     // source を判定（API経由かどうか）
     const source = managedProcesses.has(event.sessionId) ? 'api' : 'cli';
 
+    // プロジェクト情報を抽出
+    const projectPath = event.jsonlFilePath ? extractProjectPath(event.jsonlFilePath) : null;
+    const projectName = projectPath ? path.basename(projectPath) : null;
+
     // 基本ペイロード（メタ情報）
     const payload = {
       type: 'assistant-response-completed',
       sessionId: event.sessionId,
       timestamp: event.timestamp,
-      cwd: projectInfo.cwd,
-      dirName: projectInfo.dirName,
-      ...(projectInfo.projectName && { projectName: projectInfo.projectName }),
+      cwdPath: serverInfo.cwdPath,
+      cwdName: serverInfo.cwdName,
+      ...(projectPath && { projectPath }),
+      ...(projectName && { projectName }),
+      ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       source: source,
       tools: event.tools || [],
       responseTime: responseTime

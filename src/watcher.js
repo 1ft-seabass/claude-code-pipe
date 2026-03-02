@@ -78,6 +78,8 @@ class JSONLWatcher extends EventEmitter {
             if (!event.sessionId) {
               event.sessionId = this.extractSessionId(filePath);
             }
+            // JSONL ファイルパスを追加
+            event.jsonlFilePath = filePath;
             this.emit('message', event);
           }
         }
@@ -91,6 +93,8 @@ class JSONLWatcher extends EventEmitter {
             if (!event.sessionId) {
               event.sessionId = this.extractSessionId(filePath);
             }
+            // JSONL ファイルパスを追加
+            event.jsonlFilePath = filePath;
             this.emit('message', event);
           }
         }
