@@ -8,6 +8,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { parseLine } = require('./parser');
+const { extractProjectPath } = require('./subscribers');
+const { startNewSession, sendToSession } = require('./sender');
 
 /**
  * API ルーターを作成
@@ -91,6 +93,10 @@ function createApiRouter(watchDir) {
       return content;
     };
 
+    // プロジェクト情報を抽出
+    const projectPath = extractProjectPath(filePath);
+    const projectName = projectPath ? path.basename(projectPath) : null;
+
     const metadata = {
       id: sessionId,
       createdAt: events.length > 0 ? events[0].timestamp : null,
@@ -99,6 +105,8 @@ function createApiRouter(watchDir) {
       userMessageCount: userMessages.length,
       assistantMessageCount: assistantMessages.length,
       totalTokens,
+      projectPath,
+      projectName,
       firstUserMessage: userMessages.length > 0 ? extractContent(userMessages[0]) : null,
       lastUserMessage: userMessages.length > 0 ? extractContent(userMessages[userMessages.length - 1]) : null,
       firstAssistantMessage: assistantMessages.length > 0 ? extractContent(assistantMessages[0]) : null,
@@ -142,6 +150,50 @@ function createApiRouter(watchDir) {
     return events;
   }
 
+  // GET /projects - プロジェクト一覧
+  router.get('/projects', async (req, res) => {
+    try {
+      const sessions = await getSessionFiles();
+
+      // プロジェクトごとにグルーピング
+      const projectsMap = new Map();
+
+      for (const session of sessions) {
+        const projectPath = extractProjectPath(session.path);
+        const projectName = projectPath ? path.basename(projectPath) : null;
+
+        if (!projectPath) continue;
+
+        if (!projectsMap.has(projectPath)) {
+          projectsMap.set(projectPath, {
+            projectPath,
+            projectName,
+            sessionCount: 0,
+            sessions: []
+          });
+        }
+
+        const project = projectsMap.get(projectPath);
+        project.sessionCount++;
+        project.sessions.push({
+          id: session.id,
+          mtime: session.mtime
+        });
+      }
+
+      // Map を配列に変換
+      const projects = Array.from(projectsMap.values());
+
+      // セッション数の多い順にソート
+      projects.sort((a, b) => b.sessionCount - a.sessionCount);
+
+      res.json({ projects });
+    } catch (error) {
+      console.error('[api] Error getting projects:', error);
+      res.status(500).json({ error: 'Failed to get projects' });
+    }
+  });
+
   // GET /sessions - セッション一覧
   router.get('/sessions', async (req, res) => {
     try {
@@ -180,6 +232,10 @@ function createApiRouter(watchDir) {
             return sum;
           }, 0);
 
+          // プロジェクト情報を抽出
+          const projectPath = extractProjectPath(s.path);
+          const projectName = projectPath ? path.basename(projectPath) : null;
+
           return {
             id: s.id,
             createdAt: events.length > 0 ? events[0].timestamp : null,
@@ -188,6 +244,8 @@ function createApiRouter(watchDir) {
             userMessageCount: userMessages.length,
             assistantMessageCount: assistantMessages.length,
             totalTokens,
+            projectPath,
+            projectName,
             firstUserMessage: userMessages.length > 0 ? {
               content: extractContent(userMessages[0]),
               timestamp: userMessages[0].timestamp
@@ -343,6 +401,84 @@ function createApiRouter(watchDir) {
     } catch (error) {
       console.error('[api] Error getting latest assistant message:', error);
       res.status(500).json({ error: 'Failed to get latest assistant message' });
+    }
+  });
+
+  // POST /sessions/new - 新規セッション作成
+  router.post('/sessions/new', async (req, res) => {
+    try {
+      const { prompt, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+
+      // 必須パラメータのチェック
+      if (!prompt) {
+        return res.status(400).json({ error: 'prompt is required' });
+      }
+
+      // startNewSession を呼び出し
+      const result = await startNewSession(
+        prompt,
+        cwd || process.cwd(),
+        allowedTools || [],
+        dangerouslySkipPermissions || false,
+        null, // onData - API では使わない
+        null, // onError - API では使わない
+        null  // onExit - API では使わない
+      );
+
+      res.json({
+        message: 'Session started',
+        sessionId: result.sessionId,
+        pid: result.pid
+      });
+    } catch (error) {
+      console.error('[api] Error starting new session:', error);
+      res.status(500).json({ error: 'Failed to start new session' });
+    }
+  });
+
+  // POST /sessions/:id/send - 既存セッションにメッセージを送信
+  router.post('/sessions/:id/send', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const { prompt, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+
+      // 必須パラメータのチェック
+      if (!prompt) {
+        return res.status(400).json({ error: 'prompt is required' });
+      }
+
+      // cwd のチェック
+      if (!cwd) {
+        return res.status(400).json({ error: 'cwd is required' });
+      }
+
+      // セッションが存在するか確認
+      const jsonlPath = await getSessionJSONLPath(sessionId);
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      // sendToSession を呼び出し
+      const result = sendToSession(
+        sessionId,
+        prompt,
+        cwd,
+        allowedTools || [],
+        dangerouslySkipPermissions || false,
+        null, // onData - API では使わない
+        null, // onError - API では使わない
+        null  // onExit - API では使わない
+      );
+
+      res.json({
+        success: true,
+        sessionId: result.sessionId,
+        pid: result.pid,
+        message: 'Message sent successfully'
+      });
+    } catch (error) {
+      console.error('[api] Error sending message:', error);
+      res.status(500).json({ error: 'Failed to send message' });
     }
   });
 
