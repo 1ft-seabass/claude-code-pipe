@@ -34,7 +34,8 @@ Complete documentation for claude-code-pipe.
   ],
   "send": {
     "defaultAllowedTools": ["Read", "Grep", "Write", "Bash"],
-    "cancelTimeoutMs": 3000
+    "cancelTimeoutMs": 3000,
+    "defaultDangerouslySkipPermissions": false
   }
 }
 ```
@@ -68,6 +69,7 @@ Complete documentation for claude-code-pipe.
 |-------|------|----------|---------|-------------|
 | `defaultAllowedTools` | array | No | `["Read", "Grep", "Write", "Bash"]` | Default allowed tools for `claude -p` |
 | `cancelTimeoutMs` | number | No | `3000` | Timeout in milliseconds for cancel operation |
+| `defaultDangerouslySkipPermissions` | boolean | No | `false` | **⚠️ DANGEROUS:** Default value for skipping permission confirmations. When `true`, all Send API requests will skip permission confirmations unless explicitly overridden. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
 ### Webhook Levels
 
@@ -165,7 +167,8 @@ Choose the appropriate level based on your use case:
   ],
   "send": {
     "defaultAllowedTools": ["Read", "Grep"],
-    "cancelTimeoutMs": 5000
+    "cancelTimeoutMs": 5000,
+    "defaultDangerouslySkipPermissions": false
   }
 }
 ```
@@ -492,7 +495,7 @@ curl -X POST http://localhost:3100/sessions/new \
 | `prompt` | string | Yes | - | Prompt to send to Claude Code |
 | `cwd` | string | No | current directory | Working directory for the session |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
-| `dangerouslySkipPermissions` | boolean | No | `false` | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. |
+| `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
 **Response:**
 
@@ -522,12 +525,12 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 
 **Request Body:**
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `prompt` | string | Yes | Prompt to send |
-| `cwd` | string | Yes | Working directory for the session |
-| `allowedTools` | array | No | Allowed tools for Claude Code |
-| `dangerouslySkipPermissions` | boolean | No | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. |
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `prompt` | string | Yes | - | Prompt to send |
+| `cwd` | string | Yes | - | Working directory for the session |
+| `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
+| `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
 **Response:**
 
@@ -1175,6 +1178,88 @@ Check `src/subscribers.js` for delivery errors.
 #### Debug JSONL parsing
 
 Check `src/parser.js` and `src/watcher.js` for file reading errors.
+
+---
+
+## Security Considerations
+
+### ⚠️ `dangerouslySkipPermissions` Flag
+
+The `dangerouslySkipPermissions` flag bypasses Claude Code's permission confirmation prompts for tool usage. **This is extremely dangerous and should only be used in controlled, trusted environments.**
+
+#### How It Works
+
+- **Default behavior**: `false` (safe)
+  - Claude Code will prompt for permission before executing tools like `Write`, `Bash`, etc.
+  - User must manually approve each tool use
+
+- **When enabled** (`true`):
+  - Claude Code executes all allowed tools **without user confirmation**
+  - No safety prompts for file writes, command execution, etc.
+  - Fully automated operation
+
+#### Configuration Options
+
+1. **Per-request override** (recommended):
+   ```json
+   {
+     "prompt": "Your prompt",
+     "dangerouslySkipPermissions": true
+   }
+   ```
+
+2. **Global default** (use with extreme caution):
+   ```json
+   {
+     "send": {
+       "defaultDangerouslySkipPermissions": true
+     }
+   }
+   ```
+
+#### Security Risks
+
+When `dangerouslySkipPermissions` is enabled:
+
+- ⚠️ Claude Code can **write/modify/delete any files** in the working directory
+- ⚠️ Claude Code can **execute arbitrary bash commands**
+- ⚠️ No human oversight before destructive operations
+- ⚠️ Malicious or incorrect prompts can cause data loss
+
+#### Safe Usage Guidelines
+
+**Only enable this flag when ALL of these conditions are met:**
+
+1. ✅ You are in a **sandboxed/isolated environment** (Docker container, VM, etc.)
+2. ✅ The working directory contains **no critical data**
+3. ✅ You **fully trust the prompt** being sent
+4. ✅ You have **backups** of all important data
+5. ✅ You are **actively monitoring** the session
+
+**Example safe use case:**
+- Automated testing in a disposable Docker container
+- CI/CD pipeline in an isolated environment
+- Development environment with version control
+
+**Example unsafe use case:**
+- ❌ Production servers
+- ❌ Directories with sensitive data
+- ❌ Shared development machines
+- ❌ Any environment without proper backups
+
+#### Recommended Alternative
+
+For most use cases, use `allowedTools` to restrict tool usage instead:
+
+```json
+{
+  "prompt": "Analyze this code",
+  "allowedTools": ["Read", "Grep"],
+  "dangerouslySkipPermissions": false
+}
+```
+
+This allows Claude Code to read files without granting write/execute permissions.
 
 ---
 

@@ -14,11 +14,15 @@ const { startNewSession, sendToSession } = require('./sender');
 /**
  * API ルーターを作成
  * @param {string} watchDir - 監視対象ディレクトリ
+ * @param {object} config - 設定オブジェクト
  * @returns {express.Router}
  */
-function createApiRouter(watchDir) {
+function createApiRouter(watchDir, config) {
   const router = express.Router();
   const normalizedWatchDir = watchDir.replace(/^~/, process.env.HOME || '');
+
+  // デフォルト値を取得
+  const defaultDangerouslySkipPermissions = config?.send?.defaultDangerouslySkipPermissions || false;
 
   // セッションメタデータのインメモリキャッシュ
   const sessionMetadataCache = new Map();
@@ -473,12 +477,17 @@ function createApiRouter(watchDir) {
         return res.status(400).json({ error: 'prompt is required' });
       }
 
+      // dangerouslySkipPermissions のデフォルト値を config から取得
+      const skipPermissions = dangerouslySkipPermissions !== undefined
+        ? dangerouslySkipPermissions
+        : defaultDangerouslySkipPermissions;
+
       // startNewSession を呼び出し
       const result = await startNewSession(
         prompt,
         cwd || process.cwd(),
         allowedTools || [],
-        dangerouslySkipPermissions || false,
+        skipPermissions,
         null, // onData - API では使わない
         null, // onError - API では使わない
         null  // onExit - API では使わない
@@ -517,13 +526,18 @@ function createApiRouter(watchDir) {
         return res.status(404).json({ error: 'Session not found' });
       }
 
+      // dangerouslySkipPermissions のデフォルト値を config から取得
+      const skipPermissions = dangerouslySkipPermissions !== undefined
+        ? dangerouslySkipPermissions
+        : defaultDangerouslySkipPermissions;
+
       // sendToSession を呼び出し
       const result = sendToSession(
         sessionId,
         prompt,
         cwd,
         allowedTools || [],
-        dangerouslySkipPermissions || false,
+        skipPermissions,
         null, // onData - API では使わない
         null, // onError - API では使わない
         null  // onExit - API では使わない

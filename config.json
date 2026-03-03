@@ -12,6 +12,7 @@
   ],
   "send": {
     "defaultAllowedTools": ["Read", "LS", "Grep", "Write", "Bash"],
-    "cancelTimeoutMs": 3000
+    "cancelTimeoutMs": 3000,
+    "defaultDangerouslySkipPermissions": false
   }
 }

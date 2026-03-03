@@ -34,7 +34,8 @@ claude-code-pipe の完全なドキュメント
   ],
   "send": {
     "defaultAllowedTools": ["Read", "Grep", "Write", "Bash"],
-    "cancelTimeoutMs": 3000
+    "cancelTimeoutMs": 3000,
+    "defaultDangerouslySkipPermissions": false
   }
 }
 ```
@@ -68,6 +69,7 @@ claude-code-pipe の完全なドキュメント
 |-------|------|----------|---------|-------------|
 | `defaultAllowedTools` | array | No | `["Read", "Grep", "Write", "Bash"]` | `claude -p` で許可するツールのデフォルト値 |
 | `cancelTimeoutMs` | number | No | `3000` | キャンセル操作のタイムアウト（ミリ秒） |
+| `defaultDangerouslySkipPermissions` | boolean | No | `false` | **⚠️ 危険:** 権限確認をスキップするデフォルト値。`true` にすると、全ての Send API リクエストで権限確認がスキップされます（明示的に上書きしない限り）。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
 ### Webhook レベル
 
@@ -165,7 +167,8 @@ claude-code-pipe の完全なドキュメント
   ],
   "send": {
     "defaultAllowedTools": ["Read", "Grep"],
-    "cancelTimeoutMs": 5000
+    "cancelTimeoutMs": 5000,
+    "defaultDangerouslySkipPermissions": false
   }
 }
 ```
@@ -492,7 +495,7 @@ curl -X POST http://localhost:3100/sessions/new \
 | `prompt` | string | Yes | - | Claude Code に送信するプロンプト |
 | `cwd` | string | No | カレントディレクトリ | セッションの作業ディレクトリ |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
-| `dangerouslySkipPermissions` | boolean | No | `false` | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。 |
+| `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
 **レスポンス:**
 
@@ -522,12 +525,12 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 
 **リクエストボディ:**
 
-| フィールド | 型 | 必須 | 説明 |
-|-------|------|----------|-------------|
-| `prompt` | string | Yes | 送信するプロンプト |
-| `cwd` | string | Yes | セッションの作業ディレクトリ |
-| `allowedTools` | array | No | Claude Code で許可するツール |
-| `dangerouslySkipPermissions` | boolean | No | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。 |
+| フィールド | 型 | 必須 | デフォルト | 説明 |
+|-------|------|----------|---------|-------------|
+| `prompt` | string | Yes | - | 送信するプロンプト |
+| `cwd` | string | Yes | - | セッションの作業ディレクトリ |
+| `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
+| `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
 **レスポンス:**
 
@@ -1175,6 +1178,88 @@ npm run pm2:logs
 #### JSONL パースのデバッグ
 
 `src/parser.js` と `src/watcher.js` でファイル読み取りエラーを確認。
+
+---
+
+## セキュリティに関する注意事項
+
+### ⚠️ `dangerouslySkipPermissions` フラグ
+
+`dangerouslySkipPermissions` フラグは、Claude Code のツール使用時の権限確認プロンプトをバイパスします。**これは非常に危険であり、管理された信頼できる環境でのみ使用してください。**
+
+#### 動作の仕組み
+
+- **デフォルト動作**: `false`（安全）
+  - Claude Code は `Write`、`Bash` などのツールを実行する前に権限確認を求めます
+  - ユーザーは各ツール使用を手動で承認する必要があります
+
+- **有効にした場合** (`true`):
+  - Claude Code は許可された全てのツールを**ユーザー確認なしで実行**します
+  - ファイル書き込み、コマンド実行などの安全確認プロンプトが表示されません
+  - 完全自動化された動作になります
+
+#### 設定オプション
+
+1. **リクエスト毎の上書き**（推奨）:
+   ```json
+   {
+     "prompt": "プロンプト内容",
+     "dangerouslySkipPermissions": true
+   }
+   ```
+
+2. **グローバルデフォルト**（十分注意して使用）:
+   ```json
+   {
+     "send": {
+       "defaultDangerouslySkipPermissions": true
+     }
+   }
+   ```
+
+#### セキュリティリスク
+
+`dangerouslySkipPermissions` を有効にした場合:
+
+- ⚠️ Claude Code は作業ディレクトリ内の**任意のファイルを書き込み・変更・削除**できます
+- ⚠️ Claude Code は**任意の bash コマンドを実行**できます
+- ⚠️ 破壊的な操作の前に人間による監視がありません
+- ⚠️ 悪意のあるプロンプトや誤ったプロンプトがデータ損失を引き起こす可能性があります
+
+#### 安全な使用ガイドライン
+
+**以下の条件を全て満たす場合のみ、このフラグを有効にしてください:**
+
+1. ✅ **サンドボックス/隔離された環境**にいる（Docker コンテナ、VM など）
+2. ✅ 作業ディレクトリに**重要なデータが含まれていない**
+3. ✅ 送信する**プロンプトを完全に信頼**している
+4. ✅ 全ての重要なデータの**バックアップ**がある
+5. ✅ セッションを**積極的に監視**している
+
+**安全な使用例:**
+- 使い捨て Docker コンテナでの自動テスト
+- 隔離された環境での CI/CD パイプライン
+- バージョン管理された開発環境
+
+**危険な使用例:**
+- ❌ 本番サーバー
+- ❌ 機密データを含むディレクトリ
+- ❌ 共有開発マシン
+- ❌ 適切なバックアップのない環境
+
+#### 推奨される代替手段
+
+ほとんどのユースケースでは、代わりに `allowedTools` でツール使用を制限してください:
+
+```json
+{
+  "prompt": "このコードを分析して",
+  "allowedTools": ["Read", "Grep"],
+  "dangerouslySkipPermissions": false
+}
+```
+
+これにより、Claude Code はファイルを読み取ることができますが、書き込み・実行権限は付与されません。
 
 ---
 

@@ -76,7 +76,7 @@ console.log(`[index] Logging to: ${logFilePath}`);
 const watcher = new JSONLWatcher(config.watchDir);
 
 // Watch 系 API ルーターをマウント
-const apiRouter = createApiRouter(config.watchDir);
+const apiRouter = createApiRouter(config.watchDir, config);
 app.use('/', apiRouter);
 
 // WebSocket をセットアップ
