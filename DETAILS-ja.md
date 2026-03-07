@@ -864,11 +864,7 @@ curl -X POST http://localhost:1880/webhook \
   -d '{"test": "message"}'
 ```
 
-**解決策 2:** ログでエラーを確認:
-
-```bash
-npm run pm2:logs
-```
+**解決策 2:** サーバーのログ出力を確認してエラーがないか確認してください。
 
 **解決策 3:** `config.json` の Webhook 設定を確認:
 
@@ -922,11 +918,7 @@ ls -la ~/.claude/projects
 }
 ```
 
-**解決策 3:** プロセスが強制終了されたかログで確認:
-
-```bash
-npm run pm2:logs
-```
+**解決策 3:** サーバーのログを確認してプロセスが強制終了されていないか確認してください。
 
 ---
 
@@ -951,25 +943,17 @@ curl -H "Authorization: Bearer your-token" \
 }
 ```
 
-その後、サーバーを再起動:
-
-```bash
-npm run pm2:restart
-```
+その後、サーバーを再起動してください。
 
 ---
 
-### PM2 の問題
+### サーバーが起動しない
 
-**症状:** `pm2 status` でアプリが停止またはエラー状態。
+**症状:** サーバーが起動しない、またはすぐに停止する。
 
-**解決策 1:** ログを確認:
+**解決策 1:** サーバーのログ出力を確認してエラーを特定してください。
 
-```bash
-npm run pm2:logs
-```
-
-**解決策 2:** アプリを再起動:
+**解決策 2:** サーバーを再起動してください:
 
 ```bash
 npm run pm2:restart
@@ -978,9 +962,8 @@ npm run pm2:restart
 **解決策 3:** 削除してから再起動:
 
 ```bash
-npm run pm2:stop
-pm2 delete claude-code-pipe
-npm run pm2:start
+# サーバーを停止（Ctrl+C）して再度起動
+npm start
 ```
 
 ---
@@ -1001,7 +984,6 @@ claude-code-pipe/
 │   └── subscribers.js     # Webhook 配信
 ├── config.json            # 設定ファイル（gitignore 済み）
 ├── config.example.json    # サンプル設定
-├── ecosystem.config.js    # PM2 設定
 ├── package.json
 ├── README.md
 ├── README-ja.md

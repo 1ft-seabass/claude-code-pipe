@@ -34,7 +34,7 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 - **Send Mode**: Send prompts to Claude Code via REST API (creates `claude -p` processes)
 - **Cancel Mode**: Cancel running sessions programmatically
 - **Webhook Distribution**: Send session events to external services (e.g., Node-RED, Slack)
-- **Process Management**: Automatic restart with PM2 support
+- **Process Management**: Persistent session management with tmux
 
 ## Quick Start
 
@@ -64,10 +64,6 @@ Edit `config.json` - at minimum, set your `watchDir`:
 Start the server:
 
 ```bash
-# Using PM2 (Recommended)
-npm run pm2:start
-
-# Or direct start (Development)
 npm start
 ```
 
@@ -232,25 +228,6 @@ Create sessions programmatically and receive results via webhooks:
     }
   ]
 }
-```
-
-## PM2 Management
-
-```bash
-# Start
-npm run pm2:start
-
-# Check status
-npm run pm2:status
-
-# View logs
-npm run pm2:logs
-
-# Restart
-npm run pm2:restart
-
-# Stop
-npm run pm2:stop
 ```
 
 ## Documentation

@@ -864,11 +864,7 @@ curl -X POST http://localhost:1880/webhook \
   -d '{"test": "message"}'
 ```
 
-**Solution 2:** Check logs for errors:
-
-```bash
-npm run pm2:logs
-```
+**Solution 2:** Check the server log output for errors.
 
 **Solution 3:** Verify webhook configuration in `config.json`:
 
@@ -922,11 +918,7 @@ Make sure the user running `claude-code-pipe` has read access.
 }
 ```
 
-**Solution 3:** Check logs to see if the process was force-killed:
-
-```bash
-npm run pm2:logs
-```
+**Solution 3:** Check the server logs to see if the process was force-killed.
 
 ---
 
@@ -951,25 +943,17 @@ curl -H "Authorization: Bearer your-token" \
 }
 ```
 
-Then restart the server:
-
-```bash
-npm run pm2:restart
-```
+Then restart the server.
 
 ---
 
-### PM2 issues
+### Server won't start
 
-**Symptom:** `pm2 status` shows app as stopped or errored.
+**Symptom:** Server won't start or stops immediately.
 
-**Solution 1:** Check logs:
+**Solution 1:** Check the server log output to identify errors.
 
-```bash
-npm run pm2:logs
-```
-
-**Solution 2:** Restart the app:
+**Solution 2:** Restart the server:
 
 ```bash
 npm run pm2:restart
@@ -978,9 +962,8 @@ npm run pm2:restart
 **Solution 3:** Delete and restart:
 
 ```bash
-npm run pm2:stop
-pm2 delete claude-code-pipe
-npm run pm2:start
+# Stop the server (Ctrl+C) and restart
+npm start
 ```
 
 ---
@@ -1001,7 +984,6 @@ claude-code-pipe/
 │   └── subscribers.js     # Webhook distributor
 ├── config.json            # Configuration file (gitignored)
 ├── config.example.json    # Example configuration
-├── ecosystem.config.js    # PM2 configuration
 ├── package.json
 ├── README.md
 ├── README-ja.md
