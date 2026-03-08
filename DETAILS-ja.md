@@ -968,6 +968,38 @@ npm start
 
 ---
 
+### プラットフォーム固有の問題
+
+**症状:** Windows で `POST /sessions/new` または `POST /sessions/:id/send` が 501 エラーを返す。
+
+**推奨する対応方法:**
+
+1. **Claude Code CLI を直接使用** して Windows でメッセージを送信:
+   ```bash
+   claude -p "your prompt" --output-format stream-json
+   ```
+
+2. **WSL を使用** してすべての機能を利用:
+   - Windows に WSL2 をインストール
+   - WSL 内で `claude-code-pipe` を実行
+   - Linux と同様にすべての機能が動作します
+
+3. **Watch Mode のみを使用** (Windows ネイティブ):
+   - Webhook によるセッション監視は全プラットフォームで動作します
+   - Webhook を設定して Claude Code の応答通知を受信できます
+
+**技術的背景:**
+
+現在の実装では、`script` コマンド（Linux/Unix）を使用して疑似端末（PTY）を提供し、Claude CLI プロセスの出力バッファリング問題を回避しています。Windows でテストした際、いくつかの代替手段を検討しましたが、本プロジェクトのシンプルな設計思想に合う軽量な解決策を見つけることができませんでした:
+
+- **PowerShell / 直接 spawn**: テストではバッファリング問題が発生しました
+- **Git Bash**: MinGW 環境には `script` コマンドが含まれていません
+- **node-pty**: この方法で解決できますが、ネイティブコンパイルが必要で導入難易度が高まります
+
+実装をシンプルに保つため、Send Mode が必要な Windows ユーザーには WSL の利用を推奨しています。
+
+---
+
 ## 開発
 
 ### プロジェクト構造

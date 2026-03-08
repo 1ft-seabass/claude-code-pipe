@@ -968,6 +968,38 @@ npm start
 
 ---
 
+### Platform-specific issues
+
+**Symptom:** `POST /sessions/new` or `POST /sessions/:id/send` returns 501 on Windows.
+
+**Recommended solutions:**
+
+1. **Use Claude Code CLI directly** for sending messages on Windows:
+   ```bash
+   claude -p "your prompt" --output-format stream-json
+   ```
+
+2. **Use WSL** (Windows Subsystem for Linux) for full functionality:
+   - Install WSL2 on Windows
+   - Run `claude-code-pipe` inside WSL
+   - All features work as on Linux
+
+3. **Use Watch Mode only** on Windows native:
+   - Webhook-based session monitoring works on all platforms
+   - Configure webhooks to receive notifications when Claude Code responds
+
+**Technical background:**
+
+Our current implementation uses the `script` command (Linux/Unix) to provide a pseudo-terminal (PTY), which prevents output buffering issues when spawning Claude CLI processes. When we tested on Windows, we explored several alternatives but haven't found a lightweight solution that fits this project's minimal philosophy:
+
+- **PowerShell / direct spawn**: Encountered buffering issues in our testing
+- **Git Bash**: The MinGW environment doesn't include the `script` command
+- **node-pty**: While this would solve the issue, it requires native compilation which increases setup complexity
+
+We've chosen to keep the implementation simple and recommend WSL for Windows users who need the full Send Mode functionality.
+
+---
+
 ## Development
 
 ### Project Structure

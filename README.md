@@ -36,6 +36,19 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 - **Webhook Distribution**: Send session events to external services (e.g., Node-RED, Slack)
 - **Process Management**: Persistent session management with tmux
 
+## Platform Support
+
+| Feature | Linux | macOS | WSL | Windows (native) |
+|---------|-------|-------|-----|------------------|
+| Webhook / Watch Mode | ✅ | ✅ | ✅ | ✅ |
+| Send Mode | ✅ | ✅ | ✅ | ❌ |
+
+### Windows Native Environment
+
+Windows native environment supports webhook-based session monitoring only. For sending messages to Claude Code, please use the Claude Code CLI directly.
+
+WSL (Windows Subsystem for Linux) users can access full functionality.
+
 ## Quick Start
 
 ### Step 1: Install and Start
