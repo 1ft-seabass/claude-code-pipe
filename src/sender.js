@@ -7,6 +7,7 @@
 
 const { spawn } = require('child_process');
 const EventEmitter = require('events');
+const fs = require('fs');
 
 // sessionId → { proc, pid, startedAt } のマップ
 const managedProcesses = new Map();
@@ -16,6 +17,25 @@ const processEvents = new EventEmitter();
 
 // タイムアウト設定（デフォルト: 60秒）
 const SESSION_START_TIMEOUT_MS = 60 * 1000;
+
+/**
+ * Windows (non-WSL) 環境かどうかを判定
+ * @returns {boolean} true if Windows (non-WSL)
+ */
+function isWindowsNonWSL() {
+  if (process.platform !== 'win32') {
+    return false;
+  }
+
+  // WSL判定
+  try {
+    const procVersion = fs.readFileSync('/proc/version', 'utf8');
+    return !procVersion.toLowerCase().includes('microsoft');
+  } catch {
+    // /proc/version が読めない = Windows native
+    return true;
+  }
+}
 
 /**
  * 新しいセッションを開始
@@ -30,6 +50,13 @@ const SESSION_START_TIMEOUT_MS = 60 * 1000;
  */
 function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
   return new Promise((resolve, reject) => {
+    // Windows (non-WSL) チェック
+    if (isWindowsNonWSL()) {
+      const error = new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
+      reject(error);
+      return;
+    }
+
     // claude コマンドの引数を構築
     let claudeArgs = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
 
@@ -208,6 +235,11 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
  * @returns {object} { pid, sessionId }
  */
 function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
+  // Windows (non-WSL) チェック
+  if (isWindowsNonWSL()) {
+    throw new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
+  }
+
   // claude コマンドの引数を構築
   let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
 

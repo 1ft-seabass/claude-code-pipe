@@ -477,6 +477,26 @@ function createApiRouter(watchDir, config) {
         return res.status(400).json({ error: 'prompt is required' });
       }
 
+      // Windows (non-WSL) チェック
+      if (process.platform === 'win32') {
+        try {
+          const fs = require('fs');
+          const procVersion = fs.readFileSync('/proc/version', 'utf8');
+          if (!procVersion.toLowerCase().includes('microsoft')) {
+            return res.status(501).json({
+              error: 'Windows (non-WSL) is not supported for sending messages.',
+              message: 'Please use Claude Code CLI directly for input on Windows, or use WSL for full functionality.'
+            });
+          }
+        } catch {
+          // /proc/version が読めない = Windows native
+          return res.status(501).json({
+            error: 'Windows (non-WSL) is not supported for sending messages.',
+            message: 'Please use Claude Code CLI directly for input on Windows, or use WSL for full functionality.'
+          });
+        }
+      }
+
       // dangerouslySkipPermissions のデフォルト値を config から取得
       const skipPermissions = dangerouslySkipPermissions !== undefined
         ? dangerouslySkipPermissions
@@ -518,6 +538,26 @@ function createApiRouter(watchDir, config) {
       // cwd のチェック
       if (!cwd) {
         return res.status(400).json({ error: 'cwd is required' });
+      }
+
+      // Windows (non-WSL) チェック
+      if (process.platform === 'win32') {
+        try {
+          const fs = require('fs');
+          const procVersion = fs.readFileSync('/proc/version', 'utf8');
+          if (!procVersion.toLowerCase().includes('microsoft')) {
+            return res.status(501).json({
+              error: 'Windows (non-WSL) is not supported for sending messages.',
+              message: 'Please use Claude Code CLI directly for input on Windows, or use WSL for full functionality.'
+            });
+          }
+        } catch {
+          // /proc/version が読めない = Windows native
+          return res.status(501).json({
+            error: 'Windows (non-WSL) is not supported for sending messages.',
+            message: 'Please use Claude Code CLI directly for input on Windows, or use WSL for full functionality.'
+          });
+        }
       }
 
       // セッションが存在するか確認
