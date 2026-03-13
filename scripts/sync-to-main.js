@@ -101,10 +101,35 @@ function updateDevelop() {
   log('✓ develop branch updated', 'green');
 }
 
-function switchToMain() {
-  log('\n🔀 Switching to main branch...', 'blue');
+function detectWorktree() {
+  // worktree のリストを取得
+  const worktrees = exec('git worktree list', { silent: true });
+  const lines = worktrees.trim().split('\n');
 
-  // main ブランチが存在するか確認
+  // main ブランチの worktree を探す
+  for (const line of lines) {
+    if (line.includes('[main]')) {
+      const mainPath = line.split(/\s+/)[0];
+      return mainPath;
+    }
+  }
+
+  return null;
+}
+
+function switchToMain() {
+  log('\n🔀 Preparing main branch...', 'blue');
+
+  // worktree 環境かチェック
+  const mainWorktreePath = detectWorktree();
+
+  if (mainWorktreePath) {
+    log(`✓ Detected worktree: ${mainWorktreePath}`, 'green');
+    log('   Using worktree mode', 'cyan');
+    return mainWorktreePath;
+  }
+
+  // 通常のブランチ切り替え
   const branches = exec('git branch -a', { silent: true });
   const mainExists = branches.includes('main') || branches.includes('origin/main');
 
@@ -118,34 +143,81 @@ function switchToMain() {
   }
 
   log('✓ Switched to main branch', 'green');
+  return null;
 }
 
-function syncFiles() {
+function syncFiles(mainPath) {
   log('\n📋 Syncing files from develop...', 'blue');
 
-  // main ブランチの既存ファイルをすべて削除（.git 以外）
-  log('   Cleaning main branch...', 'cyan');
-  exec('git rm -rf . 2>/dev/null || true', { silent: true });
+  const isWorktree = mainPath !== null;
+  const targetDir = mainPath || process.cwd();
 
-  // develop から指定ファイルをコピー
-  filesToSync.forEach(file => {
-    const exists = exec(`git show develop:${file} 2>/dev/null || echo ""`, { silent: true, ignoreError: true }).trim();
+  if (isWorktree) {
+    // worktree モード: ファイルシステムで直接コピー
+    log('   Using filesystem copy (worktree mode)', 'cyan');
 
-    if (exists) {
-      log(`   Copying: ${file}`, 'cyan');
-      exec(`git checkout develop -- ${file}`);
-    } else {
-      log(`   ⚠️  Skipping (not found): ${file}`, 'yellow');
-    }
-  });
+    // main ディレクトリ内の既存ファイルを削除（.git 以外）
+    const itemsToDelete = fs.readdirSync(mainPath).filter(item => item !== '.git');
+    itemsToDelete.forEach(item => {
+      const itemPath = path.join(mainPath, item);
+      log(`   Removing: ${item}`, 'cyan');
+      fs.rmSync(itemPath, { recursive: true, force: true });
+    });
+
+    // develop から指定ファイルをコピー
+    const developPath = process.cwd();
+    filesToSync.forEach(file => {
+      const sourcePath = path.join(developPath, file);
+      const targetPath = path.join(mainPath, file);
+
+      if (fs.existsSync(sourcePath)) {
+        log(`   Copying: ${file}`, 'cyan');
+
+        // ディレクトリの場合
+        const stat = fs.statSync(sourcePath);
+        if (stat.isDirectory()) {
+          fs.cpSync(sourcePath, targetPath, { recursive: true });
+        } else {
+          // ファイルの場合
+          const targetDirPath = path.dirname(targetPath);
+          if (!fs.existsSync(targetDirPath)) {
+            fs.mkdirSync(targetDirPath, { recursive: true });
+          }
+          fs.copyFileSync(sourcePath, targetPath);
+        }
+      } else {
+        log(`   ⚠️  Skipping (not found): ${file}`, 'yellow');
+      }
+    });
+  } else {
+    // 通常モード: git コマンドで同期
+    log('   Using git checkout (normal mode)', 'cyan');
+
+    // main ブランチの既存ファイルをすべて削除（.git 以外）
+    log('   Cleaning main branch...', 'cyan');
+    exec('git rm -rf . 2>/dev/null || true', { silent: true });
+
+    // develop から指定ファイルをコピー
+    filesToSync.forEach(file => {
+      const exists = exec(`git show develop:${file} 2>/dev/null || echo ""`, { silent: true, ignoreError: true }).trim();
+
+      if (exists) {
+        log(`   Copying: ${file}`, 'cyan');
+        exec(`git checkout develop -- ${file}`);
+      } else {
+        log(`   ⚠️  Skipping (not found): ${file}`, 'yellow');
+      }
+    });
+  }
 
   log('✓ Files synced', 'green');
 }
 
-function cleanPackageJson() {
+function cleanPackageJson(mainPath) {
   log('\n🧹 Cleaning package.json...', 'blue');
 
-  const pkgPath = path.join(process.cwd(), 'package.json');
+  const targetDir = mainPath || process.cwd();
+  const pkgPath = path.join(targetDir, 'package.json');
 
   if (!fs.existsSync(pkgPath)) {
     log('   ⚠️  package.json not found, skipping...', 'yellow');
@@ -188,43 +260,84 @@ function cleanPackageJson() {
   log('✓ package.json cleaned', 'green');
 }
 
-function showDiff() {
+function showDiff(mainPath) {
   log('\n📊 Changes:', 'blue');
 
-  const diff = exec('git diff --stat', { silent: true }).trim();
+  const isWorktree = mainPath !== null;
 
-  if (diff) {
-    console.log(diff);
+  if (isWorktree) {
+    // worktree モード: main ディレクトリで git status を確認
+    const originalDir = process.cwd();
+    process.chdir(mainPath);
+
+    const status = exec('git status --short', { silent: true }).trim();
+
+    if (status) {
+      console.log(status);
+    } else {
+      log('   No changes', 'yellow');
+    }
+
+    process.chdir(originalDir);
   } else {
-    log('   No changes', 'yellow');
-  }
+    // 通常モード
+    const diff = exec('git diff --stat', { silent: true }).trim();
 
-  const status = exec('git status --short', { silent: true }).trim();
+    if (diff) {
+      console.log(diff);
+    } else {
+      log('   No changes', 'yellow');
+    }
 
-  if (status) {
-    log('\n📝 File status:', 'blue');
-    console.log(status);
+    const status = exec('git status --short', { silent: true }).trim();
+
+    if (status) {
+      log('\n📝 File status:', 'blue');
+      console.log(status);
+    }
   }
 }
 
-function showNextSteps() {
+function showNextSteps(mainPath) {
   log('\n✅ Sync completed!', 'green');
   log('\n📌 Next steps:', 'blue');
-  log('   1. Review changes:', 'yellow');
-  log('      git diff', 'cyan');
-  log('', 'reset');
-  log('   2. Commit and push:', 'yellow');
-  log('      git add .', 'cyan');
-  log('      git commit -m "sync: vX.Y.Z from develop"', 'cyan');
-  log('      git push origin main', 'cyan');
-  log('', 'reset');
-  log('   3. Tag release:', 'yellow');
-  log('      git tag vX.Y.Z', 'cyan');
-  log('      git push origin vX.Y.Z', 'cyan');
-  log('', 'reset');
-  log('   4. Return to develop:', 'yellow');
-  log('      git checkout develop', 'cyan');
-  log('', 'reset');
+
+  const isWorktree = mainPath !== null;
+
+  if (isWorktree) {
+    log('   1. Review changes in main worktree:', 'yellow');
+    log(`      cd ${mainPath}`, 'cyan');
+    log('      git status', 'cyan');
+    log('', 'reset');
+    log('   2. Commit and push:', 'yellow');
+    log('      git add .', 'cyan');
+    log('      git commit -m "sync: vX.Y.Z from develop"', 'cyan');
+    log('      git push origin main', 'cyan');
+    log('', 'reset');
+    log('   3. Tag release:', 'yellow');
+    log('      git tag vX.Y.Z', 'cyan');
+    log('      git push origin vX.Y.Z', 'cyan');
+    log('', 'reset');
+    log('   4. Return to develop:', 'yellow');
+    log(`      cd -`, 'cyan');
+    log('', 'reset');
+  } else {
+    log('   1. Review changes:', 'yellow');
+    log('      git diff', 'cyan');
+    log('', 'reset');
+    log('   2. Commit and push:', 'yellow');
+    log('      git add .', 'cyan');
+    log('      git commit -m "sync: vX.Y.Z from develop"', 'cyan');
+    log('      git push origin main', 'cyan');
+    log('', 'reset');
+    log('   3. Tag release:', 'yellow');
+    log('      git tag vX.Y.Z', 'cyan');
+    log('      git push origin vX.Y.Z', 'cyan');
+    log('', 'reset');
+    log('   4. Return to develop:', 'yellow');
+    log('      git checkout develop', 'cyan');
+    log('', 'reset');
+  }
 }
 
 function main() {
@@ -239,20 +352,20 @@ function main() {
     // 最新化
     updateDevelop();
 
-    // main ブランチへ切り替え
-    switchToMain();
+    // main ブランチへ切り替え（worktree の場合はパスを返す）
+    const mainPath = switchToMain();
 
     // ファイル同期
-    syncFiles();
+    syncFiles(mainPath);
 
     // package.json のクリーンアップ
-    cleanPackageJson();
+    cleanPackageJson(mainPath);
 
     // 差分表示
-    showDiff();
+    showDiff(mainPath);
 
     // 次のステップを表示
-    showNextSteps();
+    showNextSteps(mainPath);
 
   } catch (error) {
     log(`\n❌ Error: ${error.message}`, 'red');
