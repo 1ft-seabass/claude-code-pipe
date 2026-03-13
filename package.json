@@ -18,6 +18,7 @@
     "security:install-gitleaks": "node scripts/install-gitleaks.js",
     "secret-scan": "secretlint \"**/*\"",
     "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml",
+    "sync-to-main": "node scripts/sync-to-main.js",
     "prepare": "husky"
   },
   "keywords": [
