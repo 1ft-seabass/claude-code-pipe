@@ -96,9 +96,11 @@ function showDiff(mainPath) {
   const isWorktree = mainPath !== null;
 
   if (isWorktree) {
-    execSync(`git -C ${mainPath} diff --staged --stat`, { encoding: 'utf8', stdio: 'inherit' });
+    const diff = execSync(`git -C ${mainPath} diff --staged --stat`, { encoding: 'utf8', stdio: 'pipe' });
+    console.log(diff);
   } else {
-    execSync('git diff --staged --stat', { encoding: 'utf8', stdio: 'inherit' });
+    const diff = execSync('git diff --staged --stat', { encoding: 'utf8', stdio: 'pipe' });
+    console.log(diff);
   }
 }
 
