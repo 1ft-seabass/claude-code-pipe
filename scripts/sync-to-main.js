@@ -298,6 +298,24 @@ function showDiff(mainPath) {
   }
 }
 
+function stageChanges(mainPath) {
+  log('\n📦 Staging changes...', 'blue');
+
+  const isWorktree = mainPath !== null;
+
+  if (isWorktree) {
+    // worktree モード: main ディレクトリで git add を実行
+    const addCmd = `git -C ${mainPath} add .`;
+    log(`   $ ${addCmd}`, 'cyan');
+    execSync(addCmd, { encoding: 'utf8' });
+    log('✓ Changes staged in main worktree', 'green');
+  } else {
+    // 通常モード: カレントディレクトリで git add を実行
+    exec('git add .');
+    log('✓ Changes staged', 'green');
+  }
+}
+
 function showNextSteps(mainPath) {
   log('\n✅ Sync completed!', 'green');
   log('\n📌 Next steps:', 'blue');
@@ -305,36 +323,22 @@ function showNextSteps(mainPath) {
   const isWorktree = mainPath !== null;
 
   if (isWorktree) {
-    log('   1. Review changes in main worktree:', 'yellow');
-    log(`      cd ${mainPath}`, 'cyan');
-    log('      git status', 'cyan');
+    log('   1. Commit and push using the wizard:', 'yellow');
+    log('      npm run commit-main', 'cyan');
     log('', 'reset');
-    log('   2. Commit and push:', 'yellow');
-    log('      git add .', 'cyan');
-    log('      git commit -m "sync: vX.Y.Z from develop"', 'cyan');
-    log('      git push origin main', 'cyan');
-    log('', 'reset');
-    log('   3. Tag release:', 'yellow');
-    log('      git tag vX.Y.Z', 'cyan');
-    log('      git push origin vX.Y.Z', 'cyan');
-    log('', 'reset');
-    log('   4. Return to develop:', 'yellow');
-    log(`      cd -`, 'cyan');
+    log('   Or manually:', 'yellow');
+    log(`      git -C ${mainPath} commit -m "sync: vX.Y.Z from develop"`, 'cyan');
+    log(`      git -C ${mainPath} push origin main`, 'cyan');
     log('', 'reset');
   } else {
     log('   1. Review changes:', 'yellow');
-    log('      git diff', 'cyan');
+    log('      git diff --staged', 'cyan');
     log('', 'reset');
     log('   2. Commit and push:', 'yellow');
-    log('      git add .', 'cyan');
     log('      git commit -m "sync: vX.Y.Z from develop"', 'cyan');
     log('      git push origin main', 'cyan');
     log('', 'reset');
-    log('   3. Tag release:', 'yellow');
-    log('      git tag vX.Y.Z', 'cyan');
-    log('      git push origin vX.Y.Z', 'cyan');
-    log('', 'reset');
-    log('   4. Return to develop:', 'yellow');
+    log('   3. Return to develop:', 'yellow');
     log('      git checkout develop', 'cyan');
     log('', 'reset');
   }
@@ -363,6 +367,9 @@ function main() {
 
     // 差分表示
     showDiff(mainPath);
+
+    // 変更をステージング（git add まで実行）
+    stageChanges(mainPath);
 
     // 次のステップを表示
     showNextSteps(mainPath);
