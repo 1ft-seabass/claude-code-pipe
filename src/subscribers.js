@@ -10,6 +10,7 @@ const https = require('https');
 const { URL } = require('url');
 const path = require('path');
 const { managedProcesses } = require('./sender');
+const { getGitInfo } = require('./git-info');
 
 // エラー履歴管理（直近のエラーを記録して重複警告を防ぐ）
 const errorHistory = new Map(); // key: `${label}:${url}`, value: timestamp
@@ -17,6 +18,9 @@ const ERROR_THROTTLE_MS = 5 * 60 * 1000; // 5分間同じエラーを抑制
 
 // プロジェクトパスのキャッシュ（パフォーマンス最適化）
 const projectPathCache = new Map();
+
+// Git 情報のキャッシュ（プロジェクトパスをキーとして管理）
+const gitInfoCache = new Map();
 
 /**
  * JSONL ファイルパスからプロジェクトパスを抽出
@@ -80,6 +84,30 @@ function extractProjectPath(jsonlFilePath) {
     console.error('[subscribers] Failed to extract project path:', error.message);
     return null;
   }
+}
+
+/**
+ * プロジェクトパスから Git 情報を取得（キャッシュ付き）
+ * @param {string} projectPath - プロジェクトのフルパス
+ * @returns {object|null} - Git 情報オブジェクト、または null
+ */
+function getProjectGitInfo(projectPath) {
+  if (!projectPath) {
+    return null;
+  }
+
+  // キャッシュをチェック
+  if (gitInfoCache.has(projectPath)) {
+    return gitInfoCache.get(projectPath);
+  }
+
+  // Git 情報を取得
+  const gitInfo = getGitInfo(projectPath);
+
+  // キャッシュに保存
+  gitInfoCache.set(projectPath, gitInfo);
+
+  return gitInfo;
 }
 
 /**
@@ -201,6 +229,9 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
     const projectPath = event.jsonlFilePath ? extractProjectPath(event.jsonlFilePath) : null;
     const projectName = projectPath ? path.basename(projectPath) : null;
 
+    // Git 情報を取得（キャッシュ付き）
+    const gitInfo = getProjectGitInfo(projectPath);
+
     // 基本ペイロード（メタ情報）
     const payload = {
       type: 'assistant-response-completed',
@@ -213,7 +244,8 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       source: source,
       tools: event.tools || [],
-      responseTime: responseTime
+      responseTime: responseTime,
+      git: gitInfo  // Git 情報を追加
     };
 
     // includeMessage が true の場合、message を追加
