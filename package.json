@@ -16,7 +16,8 @@
     "security:verify:simple": "node scripts/security-verify.js --simple",
     "security:verify:testrun": "node scripts/security-verify.js --test-run",
     "secret-scan": "secretlint \"**/*\"",
-    "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml"
+    "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml",
+    "commit-main": "node scripts/commit-main.js"
   },
   "keywords": [
     "claude",
