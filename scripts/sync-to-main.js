@@ -222,6 +222,7 @@ function cleanPackageJson(mainPath) {
     const scriptsToRemove = [
       'prepare',           // husky
       'sync-to-main',      // このスクリプト自体
+      'commit-main',       // 開発用コミットウィザード
     ];
 
     scriptsToRemove.forEach(script => {
@@ -231,9 +232,16 @@ function cleanPackageJson(mainPath) {
       }
     });
 
-    // husky, secretlint, gitleaks 関連のスクリプトを削除
+    // 開発用スクリプトのパターンで削除
     Object.keys(pkg.scripts).forEach(key => {
-      if (key.includes('husky') || key.includes('secretlint') || key.includes('gitleaks')) {
+      // husky, secretlint, gitleaks, security, tmux 関連のスクリプトを削除
+      if (
+        key.includes('husky') ||
+        key.includes('secretlint') ||
+        key.includes('gitleaks') ||
+        key.startsWith('security:') ||
+        key.startsWith('dev:tmux:')
+      ) {
         log(`   Removing script: ${key}`, 'cyan');
         delete pkg.scripts[key];
       }
