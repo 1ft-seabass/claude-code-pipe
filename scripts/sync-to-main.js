@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { detectMainWorktree } = require('../src/git-info');
 
 // ANSI color codes
 const colors = {
@@ -101,27 +102,11 @@ function updateDevelop() {
   log('✓ develop branch updated', 'green');
 }
 
-function detectWorktree() {
-  // worktree のリストを取得
-  const worktrees = exec('git worktree list', { silent: true });
-  const lines = worktrees.trim().split('\n');
-
-  // main ブランチの worktree を探す
-  for (const line of lines) {
-    if (line.includes('[main]')) {
-      const mainPath = line.split(/\s+/)[0];
-      return mainPath;
-    }
-  }
-
-  return null;
-}
-
 function switchToMain() {
   log('\n🔀 Preparing main branch...', 'blue');
 
   // worktree 環境かチェック
-  const mainWorktreePath = detectWorktree();
+  const mainWorktreePath = detectMainWorktree();
 
   if (mainWorktreePath) {
     log(`✓ Detected worktree: ${mainWorktreePath}`, 'green');

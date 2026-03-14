@@ -16,6 +16,7 @@
 
 const readline = require('readline');
 const { execSync } = require('child_process');
+const { detectMainWorktree } = require('../src/git-info');
 
 // ANSI color codes
 const colors = {
@@ -60,22 +61,6 @@ function question(prompt) {
       resolve(answer);
     });
   });
-}
-
-function detectWorktree() {
-  // worktree のリストを取得
-  const worktrees = execSync('git worktree list', { encoding: 'utf8', stdio: 'pipe' });
-  const lines = worktrees.trim().split('\n');
-
-  // main ブランチの worktree を探す
-  for (const line of lines) {
-    if (line.includes('[main]')) {
-      const mainPath = line.split(/\s+/)[0];
-      return mainPath;
-    }
-  }
-
-  return null;
 }
 
 function checkMainBranchStatus(mainPath) {
@@ -215,7 +200,7 @@ async function main() {
 
   try {
     // worktree 検出
-    const mainPath = detectWorktree();
+    const mainPath = detectMainWorktree();
 
     if (mainPath) {
       log(`✓ Detected worktree: ${mainPath}`, 'green');
