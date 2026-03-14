@@ -19,6 +19,7 @@
     "secret-scan": "secretlint \"**/*\"",
     "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml",
     "sync-to-main": "node scripts/sync-to-main.js",
+    "commit-main": "node scripts/commit-main.js",
     "prepare": "husky"
   },
   "keywords": [
