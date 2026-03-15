@@ -239,6 +239,7 @@ function cleanPackageJson(mainPath) {
         key.includes('husky') ||
         key.includes('secretlint') ||
         key.includes('gitleaks') ||
+        key.startsWith('secret-scan') ||
         key.startsWith('security:') ||
         key.startsWith('dev:tmux:')
       ) {
