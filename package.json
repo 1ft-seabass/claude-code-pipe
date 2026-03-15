@@ -6,18 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node src/index.js",
-    "dev:tmux:start": "node scripts/start-tmux.js",
-    "dev:tmux:restart": "node scripts/start-tmux.js --force",
-    "dev:tmux:status": "tmux ls 2>/dev/null | grep claude-code-pipe || echo 'No sessions running'",
-    "dev:tmux:logs": "tmux capture-pane -t claude-code-pipe -p -S -100 2>/dev/null || echo 'Session not found'",
-    "dev:tmux:logs:realtime": "tmux attach -t claude-code-pipe",
-    "dev:tmux:stop": "tmux kill-session -t claude-code-pipe 2>/dev/null || echo 'No session to stop'",
-    "security:verify": "node scripts/security-verify.js",
-    "security:verify:simple": "node scripts/security-verify.js --simple",
-    "security:verify:testrun": "node scripts/security-verify.js --test-run",
     "secret-scan": "secretlint \"**/*\"",
-    "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml",
-    "commit-main": "node scripts/commit-main.js"
+    "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml"
   },
   "keywords": [
     "claude",

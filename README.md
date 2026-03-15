@@ -34,7 +34,6 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 - **Send Mode**: Send prompts to Claude Code via REST API (creates `claude -p` processes)
 - **Cancel Mode**: Cancel running sessions programmatically
 - **Webhook Distribution**: Send session events to external services (e.g., Node-RED, Slack)
-- **Process Management**: Persistent session management with tmux
 
 ## Platform Support
 
