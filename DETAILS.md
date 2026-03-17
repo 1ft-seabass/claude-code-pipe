@@ -50,6 +50,7 @@ Complete documentation for claude-code-pipe.
 | `port` | number | Yes | - | Port number for the server (recommended: `3100`) |
 | `apiToken` | string | No | `""` | API token for authentication. If set, all requests must include `Authorization: Bearer TOKEN` header |
 | `projectTitle` | string | No | `null` | User-defined project title (included in webhook payloads as `projectTitle`) |
+| `callbackUrl` | string | No | `null` | Callback URL for this server (included in webhook payloads as `callbackUrl`, useful for webhook receivers to send commands back) |
 | `subscribers` | array | No | `[]` | List of webhook subscribers |
 | `send` | object | No | `{}` | Configuration for send mode |
 
@@ -681,6 +682,7 @@ All events include these metadata fields:
 | `timestamp` | string | ISO 8601 timestamp |
 | `cwdPath` | string | Full path of the server's working directory (claude-code-pipe) |
 | `cwdName` | string | Base name of the server's working directory |
+| `callbackUrl` | string | Callback URL for this server (null if not set in config.json) |
 | `projectPath` | string | Full path of the session's project directory (optional, extracted from JSONL path) |
 | `projectName` | string | Base name of the session's project directory (optional, extracted from JSONL path) |
 | `projectTitle` | string | User-defined project title (optional, only if set in config.json) |
@@ -697,6 +699,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -709,6 +712,7 @@ Additional fields depend on `includeMessage` setting.
 **Note**:
 - `projectPath` and `projectName` are extracted from JSONL file path and only available for `assistant-response-completed` events
 - `projectTitle` is only included if set in `config.json`
+- `callbackUrl` is `null` if not set in `config.json`
 
 ### Full Event (includeMessage: true)
 
@@ -719,6 +723,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -759,6 +764,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:00:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender"
@@ -774,6 +780,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -800,6 +807,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:05:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -816,6 +824,7 @@ Additional fields depend on `includeMessage` setting.
   "timestamp": "2026-03-01T12:02:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"

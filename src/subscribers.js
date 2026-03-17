@@ -127,8 +127,9 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   const cwdPath = process.cwd();
   const cwdName = path.basename(cwdPath);
   const projectTitle = config.projectTitle || null;
+  const callbackUrl = config.callbackUrl || null;
 
-  const serverInfo = { cwdPath, cwdName, projectTitle };
+  const serverInfo = { cwdPath, cwdName, projectTitle, callbackUrl };
 
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
@@ -195,6 +196,7 @@ function handleProcessEvent(subscriber, eventType, event, serverInfo) {
       timestamp: event.timestamp,
       cwdPath: serverInfo.cwdPath,
       cwdName: serverInfo.cwdName,
+      callbackUrl: serverInfo.callbackUrl,
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       ...(event.code !== undefined && { code: event.code }),
       ...(event.signal !== undefined && { signal: event.signal }),
@@ -239,6 +241,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       timestamp: event.timestamp,
       cwdPath: serverInfo.cwdPath,
       cwdName: serverInfo.cwdName,
+      callbackUrl: serverInfo.callbackUrl,
       ...(projectPath && { projectPath }),
       ...(projectName && { projectName }),
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
