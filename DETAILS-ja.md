@@ -574,6 +574,34 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 
 ### Management
 
+#### `GET /version`
+
+claude-code-pipe のバージョン情報を取得します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/version
+```
+
+**レスポンス:**
+
+```json
+{
+  "name": "claude-code-pipe",
+  "version": "0.5.0",
+  "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `name` | string | パッケージ名 |
+| `version` | string | 現在のバージョン（package.json より） |
+| `description` | string | パッケージの説明 |
+
 #### `GET /projects`
 
 全プロジェクトとそのセッションをリスト表示します。

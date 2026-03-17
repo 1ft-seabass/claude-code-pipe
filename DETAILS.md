@@ -574,6 +574,34 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 
 ### Management
 
+#### `GET /version`
+
+Get version information of claude-code-pipe.
+
+**Request:**
+
+```bash
+curl http://localhost:3100/version
+```
+
+**Response:**
+
+```json
+{
+  "name": "claude-code-pipe",
+  "version": "0.5.0",
+  "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket"
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Package name |
+| `version` | string | Current version (from package.json) |
+| `description` | string | Package description |
+
 #### `GET /projects`
 
 List all projects with their sessions.

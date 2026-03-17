@@ -11,6 +11,9 @@ const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
 const { startNewSession, sendToSession } = require('./sender');
 
+// package.json を読み込み
+const packageJson = require('../package.json');
+
 /**
  * API ルーターを作成
  * @param {string} watchDir - 監視対象ディレクトリ
@@ -153,6 +156,15 @@ function createApiRouter(watchDir, config) {
 
     return events;
   }
+
+  // GET /version - バージョン情報
+  router.get('/version', (req, res) => {
+    res.json({
+      name: packageJson.name,
+      version: packageJson.version,
+      description: packageJson.description
+    });
+  });
 
   // GET /projects - プロジェクト一覧
   router.get('/projects', async (req, res) => {
