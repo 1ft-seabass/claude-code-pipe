@@ -50,6 +50,7 @@ claude-code-pipe の完全なドキュメント
 | `port` | number | Yes | - | サーバーのポート番号（推奨: `3100`） |
 | `apiToken` | string | No | `""` | API 認証トークン。設定すると、全リクエストに `Authorization: Bearer TOKEN` ヘッダーが必要 |
 | `projectTitle` | string | No | `null` | ユーザー定義のプロジェクトタイトル（Webhook ペイロードに `projectTitle` として含まれる） |
+| `callbackUrl` | string | No | `null` | このサーバーのコールバック URL（Webhook ペイロードに `callbackUrl` として含まれる、Webhook 受信側がコマンドを送り返す際に有用） |
 | `subscribers` | array | No | `[]` | Webhook 購読者のリスト |
 | `send` | object | No | `{}` | Send モードの設定 |
 
@@ -573,6 +574,34 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 
 ### Management
 
+#### `GET /version`
+
+claude-code-pipe のバージョン情報を取得します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/version
+```
+
+**レスポンス:**
+
+```json
+{
+  "name": "claude-code-pipe",
+  "version": "0.5.0",
+  "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `name` | string | パッケージ名 |
+| `version` | string | 現在のバージョン（package.json より） |
+| `description` | string | パッケージの説明 |
+
 #### `GET /projects`
 
 全プロジェクトとそのセッションをリスト表示します。
@@ -681,6 +710,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 | `timestamp` | string | ISO 8601 タイムスタンプ |
 | `cwdPath` | string | サーバー（claude-code-pipe）の作業ディレクトリのフルパス |
 | `cwdName` | string | サーバーの作業ディレクトリ名（ディレクトリのベース名） |
+| `callbackUrl` | string | このサーバーのコールバック URL（config.json で未設定の場合は null） |
 | `projectPath` | string | セッションのプロジェクトディレクトリのフルパス（オプション、JSONL パスから抽出） |
 | `projectName` | string | セッションのプロジェクトディレクトリ名（オプション、JSONL パスから抽出） |
 | `projectTitle` | string | ユーザー定義のプロジェクトタイトル（config.json で設定した場合のみ、オプション） |
@@ -697,6 +727,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -709,6 +740,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 **注**:
 - `projectPath` と `projectName` は JSONL ファイルパスから抽出され、`assistant-response-completed` イベントでのみ利用可能です
 - `projectTitle` は `config.json` で設定した場合のみ含まれます
+- `callbackUrl` は `config.json` で未設定の場合は `null` になります
 
 ### 完全イベント（includeMessage: true）
 
@@ -719,6 +751,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -759,6 +792,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:00:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender"
@@ -774,6 +808,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:00:05.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -800,6 +835,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:05:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -816,6 +852,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "timestamp": "2026-03-01T12:02:00.000Z",
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
+  "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"

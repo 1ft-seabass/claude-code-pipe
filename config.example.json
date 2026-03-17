@@ -3,6 +3,7 @@
   "port": 3100,
   "apiToken": "",
   "projectTitle": "",
+  "callbackUrl": "",
   "subscribers": [
     {
       "url": "http://localhost:1880/claude-event",
