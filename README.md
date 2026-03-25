@@ -244,6 +244,7 @@ Create sessions programmatically and receive results via webhooks:
 
 ## Documentation
 
+- **[CHANGELOG.md](./CHANGELOG.md)** - Release notes and version history
 - **[DETAILS.md](./DETAILS.md)** - Complete API reference, configuration options, webhook formats, and troubleshooting
 - **[DETAILS-ja.md](./DETAILS-ja.md)** - 日本語版の詳細ドキュメント
 
