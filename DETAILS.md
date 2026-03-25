@@ -174,6 +174,42 @@ Choose the appropriate level based on your use case:
 }
 ```
 
+#### With callbackUrl and projectTitle (Bidirectional Communication)
+
+Useful when webhook receivers need to send messages back to claude-code-pipe via the Send API.
+
+```json
+{
+  "watchDir": "~/.claude/projects",
+  "port": 3100,
+  "apiToken": "your-secret-token-here",
+  "projectTitle": "My Project",
+  "callbackUrl": "http://localhost:3100",
+  "subscribers": [
+    {
+      "url": "http://localhost:1880/webhook",
+      "label": "node-red",
+      "level": "basic",
+      "includeMessage": true
+    }
+  ],
+  "send": {
+    "defaultAllowedTools": ["Read", "Grep", "Write", "Bash"],
+    "cancelTimeoutMs": 3000,
+    "defaultDangerouslySkipPermissions": false
+  }
+}
+```
+
+**callbackUrl usage:**
+- Included in webhook payloads as the `callbackUrl` field
+- Webhook receivers can use this URL to send messages to claude-code-pipe's Send API
+- Example: Node-RED can make requests to `{{callbackUrl}}/sessions/{{sessionId}}/send`
+
+**projectTitle usage:**
+- Included in webhook payloads as the `projectTitle` field
+- Helps manage projects with human-friendly names
+
 ---
 
 ## API Reference
@@ -483,7 +519,7 @@ curl -X POST http://localhost:3100/sessions/new \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Your prompt here",
-    "cwd": "/path/to/project",
+    "projectPath": "/path/to/project",
     "allowedTools": ["Read", "Grep", "Write"],
     "dangerouslySkipPermissions": false
   }'
@@ -494,7 +530,8 @@ curl -X POST http://localhost:3100/sessions/new \
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `prompt` | string | Yes | - | Prompt to send to Claude Code |
-| `cwd` | string | No | current directory | Working directory for the session |
+| `projectPath` | string | Yes | - | Working directory for the session (project path). Use the same value as `projectPath` from webhooks. |
+| `cwd` | string | No | - | **Deprecated:** Old name for `projectPath`. Supported for backward compatibility, but `projectPath` takes precedence. |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
@@ -518,7 +555,7 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Follow-up message",
-    "cwd": "/path/to/project",
+    "projectPath": "/path/to/project",
     "allowedTools": ["Read", "Grep", "Write"],
     "dangerouslySkipPermissions": false
   }'
@@ -529,7 +566,8 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `prompt` | string | Yes | - | Prompt to send |
-| `cwd` | string | Yes | - | Working directory for the session |
+| `projectPath` | string | Yes | - | Working directory for the session (project path). Use the same value as `projectPath` from webhooks. |
+| `cwd` | string | No | - | **Deprecated:** Old name for `projectPath`. Supported for backward compatibility, but `projectPath` takes precedence. |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 

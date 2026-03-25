@@ -174,6 +174,42 @@ claude-code-pipe の完全なドキュメント
 }
 ```
 
+#### callbackUrl と projectTitle 付き（双方向通信）
+
+Webhook を受信する側が claude-code-pipe に送信 API でメッセージを送り返す場合に有用です。
+
+```json
+{
+  "watchDir": "~/.claude/projects",
+  "port": 3100,
+  "apiToken": "your-secret-token-here",
+  "projectTitle": "My Project",
+  "callbackUrl": "http://localhost:3100",
+  "subscribers": [
+    {
+      "url": "http://localhost:1880/webhook",
+      "label": "node-red",
+      "level": "basic",
+      "includeMessage": true
+    }
+  ],
+  "send": {
+    "defaultAllowedTools": ["Read", "Grep", "Write", "Bash"],
+    "cancelTimeoutMs": 3000,
+    "defaultDangerouslySkipPermissions": false
+  }
+}
+```
+
+**callbackUrl の用途:**
+- Webhook ペイロードに `callbackUrl` フィールドとして含まれます
+- Webhook 受信側がこの URL を使って claude-code-pipe の Send API にメッセージを送信できます
+- 例: Node-RED から `{{callbackUrl}}/sessions/{{sessionId}}/send` にリクエストを送る
+
+**projectTitle の用途:**
+- Webhook ペイロードに `projectTitle` フィールドとして含まれます
+- プロジェクトを人間が識別しやすい名前で管理できます
+
 ---
 
 ## API リファレンス
@@ -483,7 +519,7 @@ curl -X POST http://localhost:3100/sessions/new \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "ここにプロンプトを入力",
-    "cwd": "/path/to/project",
+    "projectPath": "/path/to/project",
     "allowedTools": ["Read", "Grep", "Write"],
     "dangerouslySkipPermissions": false
   }'
@@ -494,7 +530,8 @@ curl -X POST http://localhost:3100/sessions/new \
 | フィールド | 型 | 必須 | デフォルト | 説明 |
 |-------|------|----------|---------|-------------|
 | `prompt` | string | Yes | - | Claude Code に送信するプロンプト |
-| `cwd` | string | No | カレントディレクトリ | セッションの作業ディレクトリ |
+| `projectPath` | string | Yes | - | セッションの作業ディレクトリ（プロジェクトパス）。Webhook の `projectPath` と同じ値を使用します。 |
+| `cwd` | string | No | - | **非推奨:** `projectPath` の古い名称。後方互換性のためサポートされますが、`projectPath` を優先します。 |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
@@ -518,7 +555,7 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "追加のメッセージ",
-    "cwd": "/path/to/project",
+    "projectPath": "/path/to/project",
     "allowedTools": ["Read", "Grep", "Write"],
     "dangerouslySkipPermissions": false
   }'
@@ -529,7 +566,8 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | フィールド | 型 | 必須 | デフォルト | 説明 |
 |-------|------|----------|---------|-------------|
 | `prompt` | string | Yes | - | 送信するプロンプト |
-| `cwd` | string | Yes | - | セッションの作業ディレクトリ |
+| `projectPath` | string | Yes | - | セッションの作業ディレクトリ（プロジェクトパス）。Webhook の `projectPath` と同じ値を使用します。 |
+| `cwd` | string | No | - | **非推奨:** `projectPath` の古い名称。後方互換性のためサポートされますが、`projectPath` を優先します。 |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 

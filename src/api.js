@@ -482,11 +482,20 @@ function createApiRouter(watchDir, config) {
   // POST /sessions/new - 新規セッション作成
   router.post('/sessions/new', async (req, res) => {
     try {
-      const { prompt, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+      const { prompt, projectPath, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
 
       // 必須パラメータのチェック
       if (!prompt) {
         return res.status(400).json({ error: 'prompt is required' });
+      }
+
+      // projectPath または cwd の指定をチェック (projectPath を優先)
+      const workingDirectory = projectPath || cwd;
+      if (!workingDirectory) {
+        return res.status(400).json({
+          error: 'projectPath is required',
+          message: 'Please specify projectPath (or cwd for backward compatibility) to set the working directory for the session'
+        });
       }
 
       // Windows (non-WSL) チェック
@@ -517,7 +526,7 @@ function createApiRouter(watchDir, config) {
       // startNewSession を呼び出し
       const result = await startNewSession(
         prompt,
-        cwd || process.cwd(),
+        workingDirectory,
         allowedTools || [],
         skipPermissions,
         null, // onData - API では使わない
@@ -540,16 +549,20 @@ function createApiRouter(watchDir, config) {
   router.post('/sessions/:id/send', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const { prompt, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+      const { prompt, projectPath, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
 
       // 必須パラメータのチェック
       if (!prompt) {
         return res.status(400).json({ error: 'prompt is required' });
       }
 
-      // cwd のチェック
-      if (!cwd) {
-        return res.status(400).json({ error: 'cwd is required' });
+      // projectPath または cwd の指定をチェック (projectPath を優先)
+      const workingDirectory = projectPath || cwd;
+      if (!workingDirectory) {
+        return res.status(400).json({
+          error: 'projectPath is required',
+          message: 'Please specify projectPath (or cwd for backward compatibility) to set the working directory for the session'
+        });
       }
 
       // Windows (non-WSL) チェック
@@ -587,7 +600,7 @@ function createApiRouter(watchDir, config) {
       const result = sendToSession(
         sessionId,
         prompt,
-        cwd,
+        workingDirectory,
         allowedTools || [],
         skipPermissions,
         null, // onData - API では使わない

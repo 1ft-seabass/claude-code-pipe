@@ -78,7 +78,7 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
     }).join(' ')}`;
 
     const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
-      cwd: cwd || process.cwd(),
+      cwd: cwd,
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -261,7 +261,7 @@ function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPerm
   }).join(' ')}`;
 
   const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
-    cwd: cwd || process.cwd(),
+    cwd: cwd,
     stdio: ['pipe', 'pipe', 'pipe']
   });
 
