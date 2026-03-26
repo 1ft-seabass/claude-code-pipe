@@ -103,32 +103,29 @@ function updateDevelop() {
 }
 
 function switchToMain() {
-  log('\n🔀 Preparing main branch...', 'blue');
+  log('\n🔀 Detecting main branch worktree...', 'blue');
 
-  // worktree 環境かチェック
+  // worktree 環境をチェック
   const mainWorktreePath = detectMainWorktree();
 
   if (mainWorktreePath) {
     log(`✓ Detected worktree: ${mainWorktreePath}`, 'green');
-    log('   Using worktree mode', 'cyan');
     return mainWorktreePath;
   }
 
-  // 通常のブランチ切り替え
-  const branches = exec('git branch -a', { silent: true });
-  const mainExists = branches.includes('main') || branches.includes('origin/main');
-
-  if (!mainExists) {
-    log('⚠️  main branch does not exist yet', 'yellow');
-    log('   Creating new main branch from current develop...', 'yellow');
-    exec('git checkout -b main');
-  } else {
-    exec('git checkout main');
-    exec('git pull origin main', { ignoreError: true });
-  }
-
-  log('✓ Switched to main branch', 'green');
-  return null;
+  // worktree が見つからない場合はエラー
+  log('❌ Error: main branch worktree not found', 'red');
+  log('', 'reset');
+  log('This script requires a worktree setup for the main branch.', 'yellow');
+  log('', 'reset');
+  log('To set up a worktree:', 'cyan');
+  log('  git worktree add ../claude-code-pipe main', 'cyan');
+  log('', 'reset');
+  log('This will create the main branch worktree in the parent directory.', 'yellow');
+  log('After setup, the directory structure will be:', 'yellow');
+  log('  /path/to/claude-code-pipe-develop  ← develop branch', 'yellow');
+  log('  /path/to/claude-code-pipe          ← main branch (worktree)', 'yellow');
+  process.exit(1);
 }
 
 function syncFiles(mainPath) {

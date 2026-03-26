@@ -204,11 +204,20 @@ async function main() {
     // worktree 検出
     const mainPath = detectMainWorktree();
 
-    if (mainPath) {
-      log(`✓ Detected worktree: ${mainPath}`, 'green');
-    } else {
-      log('ℹ️  Using current branch (normal mode)', 'cyan');
+    if (!mainPath) {
+      log('❌ Error: main branch worktree not found', 'red');
+      log('', 'reset');
+      log('This script requires a worktree setup for the main branch.', 'yellow');
+      log('', 'reset');
+      log('To set up a worktree:', 'cyan');
+      log('  git worktree add ../claude-code-pipe main', 'cyan');
+      log('', 'reset');
+      log('See DEVELOP.md for more details.', 'yellow');
+      rl.close();
+      process.exit(1);
     }
+
+    log(`✓ Detected worktree: ${mainPath}`, 'green');
 
     // main ブランチの状態確認
     const hasChanges = checkMainBranchStatus(mainPath);
