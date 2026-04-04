@@ -58,6 +58,8 @@ const filesToSync = [
   'README-ja.md',
   'DETAILS.md',
   'DETAILS-ja.md',
+  'CHANGELOG.md',
+  'CHANGELOG-ja.md',
   'LICENSE',
 
   // 設定ファイル
