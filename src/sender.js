@@ -40,15 +40,18 @@ function isWindowsNonWSL() {
 /**
  * 新しいセッションを開始
  * @param {string} prompt - プロンプトテキスト
- * @param {string} cwd - 作業ディレクトリ
- * @param {Array<string>} allowedTools - 許可ツールのリスト
- * @param {boolean} dangerouslySkipPermissions - 権限確認をスキップ（危険）
- * @param {Function} onData - stdout データのコールバック
- * @param {Function} onError - stderr データのコールバック
- * @param {Function} onExit - プロセス終了時のコールバック
+ * @param {object} options - オプション
+ * @param {string} options.cwd - 作業ディレクトリ
+ * @param {Array<string>} options.allowedTools - 許可ツールのリスト
+ * @param {boolean} options.dangerouslySkipPermissions - 権限確認をスキップ（危険）
+ * @param {string} options.projectPath - プロジェクトパス（Webhook用）
+ * @param {Function} options.onData - stdout データのコールバック
+ * @param {Function} options.onError - stderr データのコールバック
+ * @param {Function} options.onExit - プロセス終了時のコールバック
  * @returns {Promise<object>} { pid, sessionId } (sessionIdは実際のUUID)
  */
-function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
+function startNewSession(prompt, options = {}) {
+  const { cwd, allowedTools, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   return new Promise((resolve, reject) => {
     // Windows (non-WSL) チェック
     if (isWindowsNonWSL()) {
@@ -106,7 +109,8 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
           sessionId: tempSessionId,
           pid,
           timestamp: new Date().toISOString(),
-          error: timeoutError.message
+          error: timeoutError.message,
+          projectPath: projectPath || null
         });
 
         proc.kill();
@@ -147,7 +151,8 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
                 processEvents.emit('session-started', {
                   sessionId: actualSessionId,
                   pid,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  projectPath: projectPath || null
                 });
 
                 resolve({ pid, sessionId: actualSessionId });
@@ -183,7 +188,8 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
         pid,
         code,
         signal,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        projectPath: projectPath || null
       });
 
       managedProcesses.delete(sessionId);
@@ -213,7 +219,8 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
         sessionId,
         pid,
         timestamp: new Date().toISOString(),
-        error: err.message
+        error: err.message,
+        projectPath: projectPath || null
       });
 
       managedProcesses.delete(tempSessionId);
@@ -226,15 +233,18 @@ function startNewSession(prompt, cwd, allowedTools, dangerouslySkipPermissions, 
  * 既存セッションに送信
  * @param {string} sessionId - セッションID (UUID形式)
  * @param {string} prompt - プロンプトテキスト
- * @param {string} cwd - 作業ディレクトリ
- * @param {Array<string>} allowedTools - 許可ツールのリスト
- * @param {boolean} dangerouslySkipPermissions - 権限確認をスキップ（危険）
- * @param {Function} onData - stdout データのコールバック
- * @param {Function} onError - stderr データのコールバック
- * @param {Function} onExit - プロセス終了時のコールバック
+ * @param {object} options - オプション
+ * @param {string} options.cwd - 作業ディレクトリ
+ * @param {Array<string>} options.allowedTools - 許可ツールのリスト
+ * @param {boolean} options.dangerouslySkipPermissions - 権限確認をスキップ（危険）
+ * @param {string} options.projectPath - プロジェクトパス（Webhook用）
+ * @param {Function} options.onData - stdout データのコールバック
+ * @param {Function} options.onError - stderr データのコールバック
+ * @param {Function} options.onExit - プロセス終了時のコールバック
  * @returns {object} { pid, sessionId }
  */
-function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPermissions, onData, onError, onExit) {
+function sendToSession(sessionId, prompt, options = {}) {
+  const { cwd, allowedTools, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   // Windows (non-WSL) チェック
   if (isWindowsNonWSL()) {
     throw new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
@@ -281,7 +291,8 @@ function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPerm
     sessionId,
     pid,
     timestamp: new Date().toISOString(),
-    resumed: true
+    resumed: true,
+    projectPath: projectPath || null
   });
 
   // stdout をコールバックに流す
@@ -308,7 +319,8 @@ function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPerm
       pid,
       code,
       signal,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      projectPath: projectPath || null
     });
 
     managedProcesses.delete(sessionId);
@@ -326,7 +338,8 @@ function sendToSession(sessionId, prompt, cwd, allowedTools, dangerouslySkipPerm
       sessionId,
       pid,
       timestamp: new Date().toISOString(),
-      error: err.message
+      error: err.message,
+      projectPath: projectPath || null
     });
 
     managedProcesses.delete(sessionId);

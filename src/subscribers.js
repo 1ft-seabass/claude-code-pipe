@@ -11,6 +11,7 @@ const { URL } = require('url');
 const path = require('path');
 const { managedProcesses } = require('./sender');
 const { getGitInfo } = require('./git-info');
+const packageJson = require('../package.json');
 
 // エラー履歴管理（直近のエラーを記録して重複警告を防ぐ）
 const errorHistory = new Map(); // key: `${label}:${url}`, value: timestamp
@@ -189,14 +190,21 @@ function handleProcessEvent(subscriber, eventType, event, serverInfo) {
   const shouldSend = level === 'full' || (level === 'basic' && basicEvents.includes(eventType));
 
   if (shouldSend) {
+    // projectPath から projectName を計算
+    const projectPath = event.projectPath || null;
+    const projectName = projectPath ? path.basename(projectPath) : null;
+
     const payload = {
       type: eventType,
+      version: packageJson.version,
       sessionId: event.sessionId,
       pid: event.pid,
       timestamp: event.timestamp,
       cwdPath: serverInfo.cwdPath,
       cwdName: serverInfo.cwdName,
       callbackUrl: serverInfo.callbackUrl,
+      ...(projectPath && { projectPath }),
+      ...(projectName && { projectName }),
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       ...(event.code !== undefined && { code: event.code }),
       ...(event.signal !== undefined && { signal: event.signal }),
@@ -213,7 +221,47 @@ function handleProcessEvent(subscriber, eventType, event, serverInfo) {
 function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo) {
   const { url, label, level, includeMessage, authorization } = subscriber;
 
-  // assistant メッセージの場合のみ処理
+  // user メッセージの場合
+  if (event.message && event.message.role === 'user') {
+    // source を判定（API経由かどうか）
+    const source = managedProcesses.has(event.sessionId) ? 'api' : 'cli';
+
+    // プロジェクト情報を抽出
+    const projectPath = event.jsonlFilePath ? extractProjectPath(event.jsonlFilePath) : null;
+    const projectName = projectPath ? path.basename(projectPath) : null;
+
+    // Git 情報を取得（キャッシュ付き）
+    const gitInfo = getProjectGitInfo(projectPath);
+
+    // タイムスタンプを記録（応答時間計算の起点）
+    sessionTimestamps.set(event.sessionId, event.timestamp);
+
+    // 基本ペイロード
+    const payload = {
+      type: 'user-message-received',
+      version: packageJson.version,
+      sessionId: event.sessionId,
+      timestamp: event.timestamp,
+      cwdPath: serverInfo.cwdPath,
+      cwdName: serverInfo.cwdName,
+      callbackUrl: serverInfo.callbackUrl,
+      ...(projectPath && { projectPath }),
+      ...(projectName && { projectName }),
+      ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
+      source: source,
+      git: gitInfo
+    };
+
+    // includeMessage が true の場合、message を追加
+    if (includeMessage) {
+      payload.message = event.message;
+    }
+
+    postToSubscriber(url, payload, authorization, label);
+    return;
+  }
+
+  // assistant メッセージの場合
   if (event.message && event.message.role === 'assistant') {
     // 応答時間を計算
     let responseTime = null;
@@ -237,6 +285,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
     // 基本ペイロード（メタ情報）
     const payload = {
       type: 'assistant-response-completed',
+      version: packageJson.version,
       sessionId: event.sessionId,
       timestamp: event.timestamp,
       cwdPath: serverInfo.cwdPath,
@@ -248,7 +297,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       source: source,
       tools: event.tools || [],
       responseTime: responseTime,
-      git: gitInfo  // Git 情報を追加
+      git: gitInfo
     };
 
     // includeMessage が true の場合、message を追加
