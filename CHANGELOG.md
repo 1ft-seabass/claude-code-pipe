@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-04-04
+
+### Added
+- **User message Webhook**: New `user-message-received` event for tracking user prompts
+- **Health endpoint**: `GET /health` returns status, version, and uptime
+- **Version in Webhook payloads**: All Webhook events now include `version` field
+- **Project info in session events**: `session-started` and `process-exit` now include `projectPath` and `projectName`
+
+### Changed
+- **sender.js options format**: `startNewSession()` and `sendToSession()` now use options object parameter
+- **Startup log**: Now displays version (e.g., `claude-code-pipe v0.7.0 listening on port 3100`)
+
 ## [0.6.0] - 2026-03-25
 
 ### Breaking Changes
@@ -55,5 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.6.0]: https://github.com/yourusername/claude-code-pipe/releases/tag/v0.6.0
-[0.5.0]: https://github.com/yourusername/claude-code-pipe/releases/tag/v0.5.0
+[0.7.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.0
+[0.6.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.6.0
+[0.5.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.5.0
