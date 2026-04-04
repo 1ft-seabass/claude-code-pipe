@@ -246,6 +246,12 @@ function cleanPackageJson(mainPath) {
     });
   }
 
+  // lint-staged 設定を削除（開発用）
+  if (pkg['lint-staged']) {
+    log('   Removing lint-staged config', 'cyan');
+    delete pkg['lint-staged'];
+  }
+
   // 整形して保存
   fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
   log('✓ package.json cleaned', 'green');
