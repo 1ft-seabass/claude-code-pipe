@@ -123,7 +123,17 @@ cat /path/to/claude-code-pipe/package.json
 - `devDependencies` が削除されている
 - `scripts` に `start` と `dev` のみが残っている
 
-### Step 3: commit-main（ユーザーが実行）
+### Step 3: セキュリティチェック
+
+main ブランチにデプロイする内容に機密情報が含まれていないか確認します。
+
+```bash
+git -C /path/to/claude-code-pipe diff --cached
+```
+
+詳細は `docs/actions/sync_to_main.md` の Step 3 を参照してください。
+
+### Step 4: commit-main（ユーザーが実行）
 
 main ブランチの変更をコミットします。
 
@@ -136,27 +146,20 @@ npm run commit-main
 
 **ウィザードの流れ**:
 1. コミットプレフィックスを選択（通常は `5: sync`）
-2. コミットメッセージを入力（例: `sync: v0.6.2 from develop`）
+2. コミットメッセージを入力（例: `sync: v0.7.0 from develop - 新機能名`）
 3. 確認して実行
 
-### Step 4: タグ作成とプッシュ（ユーザーが実行）
+### Step 5: タグ作成とプッシュ（AI が実行）
 
-**⚠️ 重要**: このステップは **ユーザーが実行** してください。AI による自動実行は推奨されません。
+タグを作成してプッシュします。
 
 ```bash
-# main ブランチでタグを作成
-cd /path/to/claude-code-pipe
-git tag v0.6.2
-git push origin main
-git push origin v0.6.2
+# develop ブランチから実行
+git -C /path/to/claude-code-pipe tag v0.7.0
+git -C /path/to/claude-code-pipe push origin v0.7.0
 ```
 
-または develop ブランチから実行:
-```bash
-git -C /path/to/claude-code-pipe tag v0.6.2
-git -C /path/to/claude-code-pipe push origin main
-git -C /path/to/claude-code-pipe push origin v0.6.2
-```
+**注意**: main の push は commit-main ウィザードで完了しているので、タグのみプッシュします。
 
 ## よくある質問
 
