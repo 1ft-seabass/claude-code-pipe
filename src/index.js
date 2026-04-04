@@ -9,6 +9,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config.json');
+const packageJson = require('../package.json');
 const JSONLWatcher = require('./watcher');
 const { createApiRouter } = require('./api');
 const { setupWebSocket } = require('./websocket');
@@ -123,23 +124,23 @@ app.post('/sessions/new', async (req, res) => {
   const allowedTools = config.send.defaultAllowedTools || [];
 
   try {
-    const result = await startNewSession(
-      prompt,
+    const result = await startNewSession(prompt, {
       cwd,
       allowedTools,
-      (data) => {
+      projectPath: cwd,
+      onData: (data) => {
         // stdout データ（必要に応じて WebSocket に配信するなど）
         console.log('[index] stdout:', data);
       },
-      (data) => {
+      onError: (data) => {
         // stderr データ
         console.error('[index] stderr:', data);
       },
-      (code, signal) => {
+      onExit: (code, signal) => {
         // プロセス終了
         console.log(`[index] Process exited: code=${code}, signal=${signal}`);
       }
-    );
+    });
 
     res.json(result);
   } catch (error) {
@@ -160,20 +161,19 @@ app.post('/sessions/:id/send', (req, res) => {
   const allowedTools = config.send.defaultAllowedTools || [];
 
   try {
-    const result = sendToSession(
-      sessionId,
-      prompt,
+    const result = sendToSession(sessionId, prompt, {
       allowedTools,
-      (data) => {
+      projectPath: null,  // 既存セッションはcwdを持っていない
+      onData: (data) => {
         console.log('[index] stdout:', data);
       },
-      (data) => {
+      onError: (data) => {
         console.error('[index] stderr:', data);
       },
-      (code, signal) => {
+      onExit: (code, signal) => {
         console.log(`[index] Process exited: code=${code}, signal=${signal}`);
       }
-    );
+    });
 
     res.json(result);
   } catch (error) {
@@ -204,11 +204,20 @@ app.get('/managed', (req, res) => {
   res.json(processes);
 });
 
+// GET /health - ヘルスチェック
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: packageJson.version,
+    uptime: process.uptime()
+  });
+});
+
 // サーバー起動
 const port = config.port || 3100;
 
 server.listen(port, () => {
-  console.log(`claude-code-pipe listening on port ${port}`);
+  console.log(`claude-code-pipe v${packageJson.version} listening on port ${port}`);
 
   // ウォッチャーを起動
   watcher.start().catch((error) => {
