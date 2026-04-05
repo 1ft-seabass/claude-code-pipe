@@ -5,6 +5,26 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.7.1] - 2026-04-05
+
+### 修正
+- **API セッション呼び出し**: api.js の `startNewSession()` と `sendToSession()` が正しい options オブジェクト形式を使用するよう修正
+  - シグネチャの不一致により、セッションが間違った作業ディレクトリで起動していた問題を修正
+- **cancel-initiated イベント**: プロジェクト識別のための `projectPath` フィールドを追加
+- **managedProcesses**: canceller で使用するために `projectPath` を保存するよう修正
+
+## [0.7.0] - 2026-04-04
+
+### 追加
+- **User メッセージ Webhook**: ユーザープロンプトを追跡する `user-message-received` イベントを追加
+- **Health エンドポイント**: `GET /health` でステータス、バージョン、稼働時間を返却
+- **Webhook ペイロードにバージョン**: すべての Webhook イベントに `version` フィールドを追加
+- **セッションイベントにプロジェクト情報**: `session-started` と `process-exit` に `projectPath` と `projectName` を追加
+
+### 変更
+- **sender.js の options 形式**: `startNewSession()` と `sendToSession()` が options オブジェクトパラメータを使用するよう変更
+- **起動ログ**: バージョンを表示するよう変更（例: `claude-code-pipe v0.7.0 listening on port 3100`）
+
 ## [0.6.0] - 2026-03-25
 
 ### 破壊的変更
