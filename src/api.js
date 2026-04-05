@@ -524,15 +524,12 @@ function createApiRouter(watchDir, config) {
         : defaultDangerouslySkipPermissions;
 
       // startNewSession を呼び出し
-      const result = await startNewSession(
-        prompt,
-        workingDirectory,
-        allowedTools || [],
-        skipPermissions,
-        null, // onData - API では使わない
-        null, // onError - API では使わない
-        null  // onExit - API では使わない
-      );
+      const result = await startNewSession(prompt, {
+        cwd: workingDirectory,
+        allowedTools: allowedTools || [],
+        dangerouslySkipPermissions: skipPermissions,
+        projectPath: workingDirectory
+      });
 
       res.json({
         message: 'Session started',
@@ -597,16 +594,12 @@ function createApiRouter(watchDir, config) {
         : defaultDangerouslySkipPermissions;
 
       // sendToSession を呼び出し
-      const result = sendToSession(
-        sessionId,
-        prompt,
-        workingDirectory,
-        allowedTools || [],
-        skipPermissions,
-        null, // onData - API では使わない
-        null, // onError - API では使わない
-        null  // onExit - API では使わない
-      );
+      const result = sendToSession(sessionId, prompt, {
+        cwd: workingDirectory,
+        allowedTools: allowedTools || [],
+        dangerouslySkipPermissions: skipPermissions,
+        projectPath: workingDirectory
+      });
 
       res.json({
         success: true,

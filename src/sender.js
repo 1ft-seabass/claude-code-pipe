@@ -95,7 +95,8 @@ function startNewSession(prompt, options = {}) {
     managedProcesses.set(tempSessionId, {
       proc,
       pid,
-      startedAt: new Date()
+      startedAt: new Date(),
+      projectPath: projectPath || null
     });
 
     // タイムアウト設定
@@ -281,7 +282,8 @@ function sendToSession(sessionId, prompt, options = {}) {
   managedProcesses.set(sessionId, {
     proc,
     pid,
-    startedAt: new Date()
+    startedAt: new Date(),
+    projectPath: projectPath || null
   });
 
   console.log(`[sender] Sent to existing session: sessionId=${sessionId}, pid=${pid}`);
