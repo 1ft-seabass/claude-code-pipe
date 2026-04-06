@@ -43,6 +43,8 @@ function isWindowsNonWSL() {
  * @param {object} options - オプション
  * @param {string} options.cwd - 作業ディレクトリ
  * @param {Array<string>} options.allowedTools - 許可ツールのリスト
+ * @param {Array<string>} options.disallowedTools - 禁止ツールのリスト
+ * @param {string} options.model - 使用モデル (例: "sonnet", "opus", "claude-sonnet-4-6")
  * @param {boolean} options.dangerouslySkipPermissions - 権限確認をスキップ（危険）
  * @param {string} options.projectPath - プロジェクトパス（Webhook用）
  * @param {Function} options.onData - stdout データのコールバック
@@ -51,7 +53,7 @@ function isWindowsNonWSL() {
  * @returns {Promise<object>} { pid, sessionId } (sessionIdは実際のUUID)
  */
 function startNewSession(prompt, options = {}) {
-  const { cwd, allowedTools, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
+  const { cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   return new Promise((resolve, reject) => {
     // Windows (non-WSL) チェック
     if (isWindowsNonWSL()) {
@@ -64,7 +66,15 @@ function startNewSession(prompt, options = {}) {
     let claudeArgs = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
 
     if (allowedTools && allowedTools.length > 0) {
-      claudeArgs.push('--allowed-tools', allowedTools.join(','));
+      claudeArgs.push('--allowedTools', allowedTools.join(' '));
+    }
+
+    if (disallowedTools && disallowedTools.length > 0) {
+      claudeArgs.push('--disallowedTools', disallowedTools.join(' '));
+    }
+
+    if (model) {
+      claudeArgs.push('--model', model);
     }
 
     if (dangerouslySkipPermissions) {
@@ -237,6 +247,8 @@ function startNewSession(prompt, options = {}) {
  * @param {object} options - オプション
  * @param {string} options.cwd - 作業ディレクトリ
  * @param {Array<string>} options.allowedTools - 許可ツールのリスト
+ * @param {Array<string>} options.disallowedTools - 禁止ツールのリスト
+ * @param {string} options.model - 使用モデル (例: "sonnet", "opus", "claude-sonnet-4-6")
  * @param {boolean} options.dangerouslySkipPermissions - 権限確認をスキップ（危険）
  * @param {string} options.projectPath - プロジェクトパス（Webhook用）
  * @param {Function} options.onData - stdout データのコールバック
@@ -245,7 +257,7 @@ function startNewSession(prompt, options = {}) {
  * @returns {object} { pid, sessionId }
  */
 function sendToSession(sessionId, prompt, options = {}) {
-  const { cwd, allowedTools, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
+  const { cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   // Windows (non-WSL) チェック
   if (isWindowsNonWSL()) {
     throw new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
@@ -255,7 +267,15 @@ function sendToSession(sessionId, prompt, options = {}) {
   let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
 
   if (allowedTools && allowedTools.length > 0) {
-    claudeArgs.push('--allowed-tools', allowedTools.join(','));
+    claudeArgs.push('--allowedTools', allowedTools.join(' '));
+  }
+
+  if (disallowedTools && disallowedTools.length > 0) {
+    claudeArgs.push('--disallowedTools', disallowedTools.join(' '));
+  }
+
+  if (model) {
+    claudeArgs.push('--model', model);
   }
 
   if (dangerouslySkipPermissions) {
@@ -376,11 +396,79 @@ function getManagedProcess(sessionId) {
   return managedProcesses.get(sessionId) || null;
 }
 
+/**
+ * 指定セッションのプロセスを強制終了
+ * @param {string} sessionId - セッションID
+ * @returns {object|null} { sessionId, pid, killed: boolean } または null (存在しない場合)
+ */
+function killProcess(sessionId) {
+  const info = managedProcesses.get(sessionId);
+  if (!info) {
+    return null; // セッションが存在しない
+  }
+
+  try {
+    if (!info.proc.killed) {
+      info.proc.kill('SIGTERM');
+      console.log(`[sender] Killed process: sessionId=${sessionId}, pid=${info.pid}`);
+      managedProcesses.delete(sessionId);
+      return {
+        sessionId,
+        pid: info.pid,
+        killed: true
+      };
+    } else {
+      // 既に終了済み
+      managedProcesses.delete(sessionId);
+      return {
+        sessionId,
+        pid: info.pid,
+        killed: false // 既に終了していた
+      };
+    }
+  } catch (error) {
+    console.error(`[sender] Failed to kill process: sessionId=${sessionId}, error=${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * 全プロセスを強制終了（緊急用）
+ * @returns {object} { killed: number, sessions: Array<string> }
+ */
+function killAllProcesses() {
+  const killedSessions = [];
+  let killedCount = 0;
+
+  for (const [sessionId, info] of managedProcesses.entries()) {
+    try {
+      if (!info.proc.killed) {
+        info.proc.kill('SIGTERM');
+        killedCount++;
+        killedSessions.push(sessionId);
+        console.log(`[sender] Killed process: sessionId=${sessionId}, pid=${info.pid}`);
+      }
+    } catch (error) {
+      console.error(`[sender] Failed to kill process: sessionId=${sessionId}, error=${error.message}`);
+    }
+  }
+
+  // マップをクリア
+  managedProcesses.clear();
+
+  return {
+    killed: killedCount,
+    sessions: killedSessions
+  };
+}
+
 module.exports = {
   startNewSession,
   sendToSession,
   getManagedProcesses,
   getManagedProcess,
+  killProcess,
+  killAllProcesses,
   processEvents,
   managedProcesses  // セッション判定用に公開
 };
