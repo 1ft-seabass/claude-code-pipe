@@ -533,6 +533,8 @@ curl -X POST http://localhost:3100/sessions/new \
 | `projectPath` | string | Yes | - | セッションの作業ディレクトリ（プロジェクトパス）。Webhook の `projectPath` と同じ値を使用します。 |
 | `cwd` | string | No | - | **非推奨:** `projectPath` の古い名称。後方互換性のためサポートされますが、`projectPath` を優先します。 |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
+| `disallowedTools` | array | No | `[]` | Claude Code で禁止するツール。パターンマッチングをサポート（例: `["Edit", "Write", "Bash(rm *)"]`） |
+| `model` | string | No | - | 使用するモデル（例: `"sonnet"`, `"opus"`）。未指定の場合は Claude Code のデフォルトを使用 |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
 **レスポンス:**
@@ -569,6 +571,8 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | `projectPath` | string | Yes | - | セッションの作業ディレクトリ（プロジェクトパス）。Webhook の `projectPath` と同じ値を使用します。 |
 | `cwd` | string | No | - | **非推奨:** `projectPath` の古い名称。後方互換性のためサポートされますが、`projectPath` を優先します。 |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Claude Code で許可するツール |
+| `disallowedTools` | array | No | `[]` | Claude Code で禁止するツール。パターンマッチングをサポート（例: `["Edit", "Write", "Bash(rm *)"]`） |
+| `model` | string | No | - | 使用するモデル（例: `"sonnet"`, `"opus"`）。未指定の場合は Claude Code のデフォルトを使用 |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (デフォルト: `false`) | **⚠️ 危険:** 権限確認をスキップします。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
 **レスポンス:**
@@ -730,6 +734,124 @@ curl http://localhost:3100/managed
   ]
 }
 ```
+
+#### `GET /claude-version`
+
+Claude Code CLI のバージョンを取得します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/claude-version
+```
+
+**レスポンス:**
+
+```json
+{
+  "version": "2.0.45",
+  "raw": "2.0.45 (Claude Code)"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `version` | string | パースされたバージョン番号 |
+| `raw` | string | `claude --version` の生出力 |
+
+**エラーレスポンス（Claude CLI が見つからない場合）:**
+
+```json
+{
+  "error": "Failed to get Claude version",
+  "message": "claude command not found"
+}
+```
+
+#### `GET /processes`
+
+管理中の全プロセスを詳細情報付きでリスト表示します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/processes
+```
+
+**レスポンス:**
+
+```json
+{
+  "processes": [
+    {
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "pid": 12345,
+      "startTime": "2026-03-01T12:00:00.000Z",
+      "status": "running"
+    }
+  ]
+}
+```
+
+#### `DELETE /processes/:sessionId`
+
+指定したセッション ID の管理中プロセスを終了します。
+
+**リクエスト:**
+
+```bash
+curl -X DELETE http://localhost:3100/processes/SESSION_ID
+```
+
+**レスポンス（成功）:**
+
+```json
+{
+  "success": true,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": "Process killed"
+}
+```
+
+**レスポンス（見つからない）:**
+
+```json
+{
+  "success": false,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": "Process not found"
+}
+```
+
+#### `DELETE /processes`
+
+管理中の全プロセスを終了します。
+
+**リクエスト:**
+
+```bash
+curl -X DELETE http://localhost:3100/processes
+```
+
+**レスポンス:**
+
+```json
+{
+  "success": true,
+  "killed": 3,
+  "message": "All processes killed"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `success` | boolean | 成功時は常に `true` |
+| `killed` | number | 終了したプロセス数 |
+| `message` | string | ステータスメッセージ |
 
 ---
 

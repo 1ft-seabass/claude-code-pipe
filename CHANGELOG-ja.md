@@ -5,6 +5,22 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.7.2] - 2026-04-06
+
+### 追加
+- **CLI オプションパススルー**: Send API が追加の Claude Code CLI オプションをサポート
+  - `disallowedTools`: 禁止するツールの配列（例: `["Edit", "Write", "Bash(rm *)"]`）
+  - `model`: モデル選択（例: `"sonnet"`, `"opus"`）
+- **プロセス管理 API**:
+  - `GET /processes`: 管理中の全プロセスを一覧表示
+  - `DELETE /processes/:sessionId`: セッション ID で特定のプロセスを終了
+  - `DELETE /processes`: 管理中の全プロセスを終了
+- **Claude バージョン API**: `GET /claude-version` で Claude Code CLI のバージョンを取得
+
+### ドキュメント
+- DETAILS.md と DETAILS-ja.md に新しい API エンドポイントを追加
+- Send API ドキュメントに `disallowedTools` と `model` パラメータを追加
+
 ## [0.7.1] - 2026-04-05
 
 ### 修正
@@ -75,5 +91,8 @@
 
 ---
 
-[0.6.0]: https://github.com/yourusername/claude-code-pipe/releases/tag/v0.6.0
-[0.5.0]: https://github.com/yourusername/claude-code-pipe/releases/tag/v0.5.0
+[0.7.2]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.2
+[0.7.1]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.1
+[0.7.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.0
+[0.6.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.6.0
+[0.5.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.5.0
