@@ -7,9 +7,10 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
-const { startNewSession, sendToSession } = require('./sender');
+const { startNewSession, sendToSession, getManagedProcesses, killProcess, killAllProcesses } = require('./sender');
 
 // package.json を読み込み
 const packageJson = require('../package.json');
@@ -164,6 +165,54 @@ function createApiRouter(watchDir, config) {
       version: packageJson.version,
       description: packageJson.description
     });
+  });
+
+  // GET /claude-version - Claude Code CLI バージョン情報
+  router.get('/claude-version', async (req, res) => {
+    try {
+      const proc = spawn('claude', ['-v']);
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          console.error('[api] Error getting claude version:', stderr);
+          return res.status(500).json({
+            error: 'Failed to get claude version',
+            details: stderr
+          });
+        }
+
+        // claude -v の出力をパース（"x.y.z (Claude Code)" 形式）
+        const raw = stdout.trim();
+        const versionMatch = raw.match(/^(\d+\.\d+\.\d+)/);
+        const version = versionMatch ? versionMatch[1] : raw;
+
+        res.json({
+          version,
+          raw
+        });
+      });
+
+      proc.on('error', (err) => {
+        console.error('[api] Failed to execute claude -v:', err);
+        res.status(500).json({
+          error: 'Failed to execute claude command',
+          details: err.message
+        });
+      });
+    } catch (error) {
+      console.error('[api] Error in /claude-version:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // GET /projects - プロジェクト一覧
@@ -482,7 +531,7 @@ function createApiRouter(watchDir, config) {
   // POST /sessions/new - 新規セッション作成
   router.post('/sessions/new', async (req, res) => {
     try {
-      const { prompt, projectPath, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+      const { prompt, projectPath, cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions } = req.body;
 
       // 必須パラメータのチェック
       if (!prompt) {
@@ -527,6 +576,8 @@ function createApiRouter(watchDir, config) {
       const result = await startNewSession(prompt, {
         cwd: workingDirectory,
         allowedTools: allowedTools || [],
+        disallowedTools: disallowedTools || [],
+        model: model || undefined,
         dangerouslySkipPermissions: skipPermissions,
         projectPath: workingDirectory
       });
@@ -542,11 +593,59 @@ function createApiRouter(watchDir, config) {
     }
   });
 
+  // GET /processes - 管理中のプロセス一覧
+  router.get('/processes', (req, res) => {
+    try {
+      const processes = getManagedProcesses();
+      res.json({ processes });
+    } catch (error) {
+      console.error('[api] Error getting managed processes:', error);
+      res.status(500).json({ error: 'Failed to get managed processes' });
+    }
+  });
+
+  // DELETE /processes/:sessionId - 指定プロセス強制終了
+  router.delete('/processes/:sessionId', (req, res) => {
+    try {
+      const sessionId = req.params.sessionId;
+      const result = killProcess(sessionId);
+
+      if (!result) {
+        return res.status(404).json({
+          error: 'Process not found',
+          sessionId
+        });
+      }
+
+      res.json({
+        message: 'Process terminated',
+        ...result
+      });
+    } catch (error) {
+      console.error('[api] Error killing process:', error);
+      res.status(500).json({ error: 'Failed to kill process' });
+    }
+  });
+
+  // DELETE /processes - 全プロセス強制終了（緊急用）
+  router.delete('/processes', (req, res) => {
+    try {
+      const result = killAllProcesses();
+      res.json({
+        message: 'All processes terminated',
+        ...result
+      });
+    } catch (error) {
+      console.error('[api] Error killing all processes:', error);
+      res.status(500).json({ error: 'Failed to kill all processes' });
+    }
+  });
+
   // POST /sessions/:id/send - 既存セッションにメッセージを送信
   router.post('/sessions/:id/send', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const { prompt, projectPath, cwd, allowedTools, dangerouslySkipPermissions } = req.body;
+      const { prompt, projectPath, cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions } = req.body;
 
       // 必須パラメータのチェック
       if (!prompt) {
@@ -597,6 +696,8 @@ function createApiRouter(watchDir, config) {
       const result = sendToSession(sessionId, prompt, {
         cwd: workingDirectory,
         allowedTools: allowedTools || [],
+        disallowedTools: disallowedTools || [],
+        model: model || undefined,
         dangerouslySkipPermissions: skipPermissions,
         projectPath: workingDirectory
       });

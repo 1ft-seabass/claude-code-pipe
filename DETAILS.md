@@ -533,6 +533,8 @@ curl -X POST http://localhost:3100/sessions/new \
 | `projectPath` | string | Yes | - | Working directory for the session (project path). Use the same value as `projectPath` from webhooks. |
 | `cwd` | string | No | - | **Deprecated:** Old name for `projectPath`. Supported for backward compatibility, but `projectPath` takes precedence. |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
+| `disallowedTools` | array | No | `[]` | Tools to disallow for Claude Code. Supports pattern matching (e.g., `["Edit", "Write", "Bash(rm *)"]`) |
+| `model` | string | No | - | Model to use (e.g., `"sonnet"`, `"opus"`). If not specified, uses Claude Code's default |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
 **Response:**
@@ -569,6 +571,8 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 | `projectPath` | string | Yes | - | Working directory for the session (project path). Use the same value as `projectPath` from webhooks. |
 | `cwd` | string | No | - | **Deprecated:** Old name for `projectPath`. Supported for backward compatibility, but `projectPath` takes precedence. |
 | `allowedTools` | array | No | `config.send.defaultAllowedTools` | Allowed tools for Claude Code |
+| `disallowedTools` | array | No | `[]` | Tools to disallow for Claude Code. Supports pattern matching (e.g., `["Edit", "Write", "Bash(rm *)"]`) |
+| `model` | string | No | - | Model to use (e.g., `"sonnet"`, `"opus"`). If not specified, uses Claude Code's default |
 | `dangerouslySkipPermissions` | boolean | No | `config.send.defaultDangerouslySkipPermissions` (default: `false`) | **⚠️ DANGEROUS:** Skip permission confirmations. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
 **Response:**
@@ -730,6 +734,124 @@ curl http://localhost:3100/managed
   ]
 }
 ```
+
+#### `GET /claude-version`
+
+Get the Claude Code CLI version.
+
+**Request:**
+
+```bash
+curl http://localhost:3100/claude-version
+```
+
+**Response:**
+
+```json
+{
+  "version": "2.0.45",
+  "raw": "2.0.45 (Claude Code)"
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | Parsed version number |
+| `raw` | string | Raw output from `claude --version` |
+
+**Error Response (if Claude CLI not found):**
+
+```json
+{
+  "error": "Failed to get Claude version",
+  "message": "claude command not found"
+}
+```
+
+#### `GET /processes`
+
+List all managed processes with detailed information.
+
+**Request:**
+
+```bash
+curl http://localhost:3100/processes
+```
+
+**Response:**
+
+```json
+{
+  "processes": [
+    {
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "pid": 12345,
+      "startTime": "2026-03-01T12:00:00.000Z",
+      "status": "running"
+    }
+  ]
+}
+```
+
+#### `DELETE /processes/:sessionId`
+
+Kill a specific managed process by session ID.
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:3100/processes/SESSION_ID
+```
+
+**Response (success):**
+
+```json
+{
+  "success": true,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": "Process killed"
+}
+```
+
+**Response (not found):**
+
+```json
+{
+  "success": false,
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": "Process not found"
+}
+```
+
+#### `DELETE /processes`
+
+Kill all managed processes.
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:3100/processes
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "killed": 3,
+  "message": "All processes killed"
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | boolean | Always `true` on success |
+| `killed` | number | Number of processes killed |
+| `message` | string | Status message |
 
 ---
 
