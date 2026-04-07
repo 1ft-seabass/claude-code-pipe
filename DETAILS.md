@@ -361,10 +361,17 @@ curl http://localhost:3100/sessions?detail=true
 
 Get all messages from a session.
 
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages?projectPath=/path/to/project"
 ```
 
 **Response:**
@@ -395,10 +402,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages
 
 Get the first user message from a session.
 
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/user/first
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/user/first?projectPath=/path/to/project"
 ```
 
 **Response:**
@@ -418,10 +432,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/user/first
 
 Get the latest user message from a session.
 
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/user/latest
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/user/latest?projectPath=/path/to/project"
 ```
 
 **Response:**
@@ -441,10 +462,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/user/latest
 
 Get the first assistant message from a session.
 
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/first
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/first?projectPath=/path/to/project"
 ```
 
 **Response:**
@@ -464,10 +492,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/first
 
 Get the latest assistant message from a session.
 
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
 **Request:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest?projectPath=/path/to/project"
 ```
 
 **Response:**

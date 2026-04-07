@@ -361,10 +361,17 @@ curl http://localhost:3100/sessions?detail=true
 
 セッションの全メッセージを取得します。
 
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages?projectPath=/path/to/project"
 ```
 
 **レスポンス:**
@@ -395,10 +402,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages
 
 セッションの最初のユーザーメッセージを取得します。
 
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/user/first
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/user/first?projectPath=/path/to/project"
 ```
 
 **レスポンス:**
@@ -418,10 +432,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/user/first
 
 セッションの最新のユーザーメッセージを取得します。
 
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/user/latest
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/user/latest?projectPath=/path/to/project"
 ```
 
 **レスポンス:**
@@ -441,10 +462,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/user/latest
 
 セッションの最初のアシスタントメッセージを取得します。
 
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/first
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/first?projectPath=/path/to/project"
 ```
 
 **レスポンス:**
@@ -464,10 +492,17 @@ curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/first
 
 セッションの最新のアシスタントメッセージを取得します。
 
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
 **リクエスト:**
 
 ```bash
 curl http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest?projectPath=/path/to/project"
 ```
 
 **レスポンス:**
