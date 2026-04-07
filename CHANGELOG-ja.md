@@ -5,6 +5,21 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.7.3] - 2026-04-07
+
+### 追加
+- **projectPath によるメッセージ取得**: すべてのメッセージ取得エンドポイントが `projectPath` クエリパラメータをサポート
+  - `GET /sessions/:id/messages?projectPath=/path/to/project`
+  - `GET /sessions/:id/messages/user/first?projectPath=/path/to/project`
+  - `GET /sessions/:id/messages/user/latest?projectPath=/path/to/project`
+  - `GET /sessions/:id/messages/assistant/first?projectPath=/path/to/project`
+  - `GET /sessions/:id/messages/assistant/latest?projectPath=/path/to/project`
+  - 複数のプロジェクトで同じセッション ID が存在する場合の曖昧さを解消
+  - 後方互換性を維持（projectPath パラメータなしでも動作）
+
+### ドキュメント
+- DETAILS.md と DETAILS-ja.md に projectPath クエリパラメータのドキュメントを更新
+
 ## [0.7.2] - 2026-04-06
 
 ### 追加
@@ -91,6 +106,7 @@
 
 ---
 
+[0.7.3]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.3
 [0.7.2]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.2
 [0.7.1]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.1
 [0.7.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.0
