@@ -1,6 +1,6 @@
 {
   "name": "claude-code-pipe",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket",
   "main": "src/index.js",
   "scripts": {

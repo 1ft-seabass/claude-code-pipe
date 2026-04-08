@@ -132,9 +132,24 @@ function createApiRouter(watchDir, config) {
 
   /**
    * 指定セッションの JSONL ファイルパスを取得
+   * @param {string} sessionId - セッション ID
+   * @param {string} [projectPath] - プロジェクトパス（オプション）
+   * @returns {string|null} JSONL ファイルパス
    */
-  async function getSessionJSONLPath(sessionId) {
+  async function getSessionJSONLPath(sessionId, projectPath) {
     const sessions = await getSessionFiles();
+
+    // projectPath が指定されている場合、そのプロジェクト内のみ検索
+    if (projectPath) {
+      const normalizedProjectPath = path.normalize(projectPath);
+      const session = sessions.find(s => {
+        const sessionProjectPath = extractProjectPath(s.path);
+        return s.id === sessionId && sessionProjectPath && path.normalize(sessionProjectPath) === normalizedProjectPath;
+      });
+      return session ? session.path : null;
+    }
+
+    // projectPath が指定されていない場合は従来通り
     const session = sessions.find(s => s.id === sessionId);
     return session ? session.path : null;
   }
@@ -403,7 +418,8 @@ function createApiRouter(watchDir, config) {
   router.get('/sessions/:id/messages', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const jsonlPath = await getSessionJSONLPath(sessionId);
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
 
       if (!jsonlPath) {
         return res.status(404).json({ error: 'Session not found' });
@@ -424,7 +440,8 @@ function createApiRouter(watchDir, config) {
   router.get('/sessions/:id/messages/user/first', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const jsonlPath = await getSessionJSONLPath(sessionId);
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
 
       if (!jsonlPath) {
         return res.status(404).json({ error: 'Session not found' });
@@ -451,7 +468,8 @@ function createApiRouter(watchDir, config) {
   router.get('/sessions/:id/messages/user/latest', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const jsonlPath = await getSessionJSONLPath(sessionId);
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
 
       if (!jsonlPath) {
         return res.status(404).json({ error: 'Session not found' });
@@ -478,7 +496,8 @@ function createApiRouter(watchDir, config) {
   router.get('/sessions/:id/messages/assistant/first', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const jsonlPath = await getSessionJSONLPath(sessionId);
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
 
       if (!jsonlPath) {
         return res.status(404).json({ error: 'Session not found' });
@@ -505,7 +524,8 @@ function createApiRouter(watchDir, config) {
   router.get('/sessions/:id/messages/assistant/latest', async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const jsonlPath = await getSessionJSONLPath(sessionId);
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
 
       if (!jsonlPath) {
         return res.status(404).json({ error: 'Session not found' });
