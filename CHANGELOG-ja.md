@@ -5,6 +5,23 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.7.4] - 2026-04-10
+
+### 修正
+- **改行によるセッション分離バグ**: 改行（`\n`）を含むメッセージを送信するとシェルがコマンド区切りとして解釈し、セッションが分離する問題を修正。さらに改行位置以降の CLI 引数（`--allowedTools`、`--model` 等）が消失する問題も解消
+  - `src/sender.js` のクォート処理で改行を含む引数をダブルクォートで囲むよう修正
+- **初手ユーザーメッセージの webhook 検知漏れ**: watcher の `add` イベントがファイル位置を記録するだけで内容を読まなかったため、最初のユーザーメッセージが webhook に配信されない問題を修正
+
+### 追加
+- **チャットメッセージ専用エンドポイント**: ツール操作を除外し、純粋な会話メッセージのみを返す新エンドポイント
+  - `GET /sessions/:id/messages/chat/user/first`
+  - `GET /sessions/:id/messages/chat/user/latest`
+  - `GET /sessions/:id/messages/chat/assistant/first`
+  - `GET /sessions/:id/messages/chat/assistant/latest`
+
+### ドキュメント
+- DETAILS.md と DETAILS-ja.md にチャットメッセージエンドポイントのドキュメントを追加
+
 ## [0.7.3] - 2026-04-07
 
 ### 追加
@@ -106,6 +123,7 @@
 
 ---
 
+[0.7.4]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.4
 [0.7.3]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.3
 [0.7.2]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.2
 [0.7.1]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.1

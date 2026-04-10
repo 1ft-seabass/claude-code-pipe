@@ -522,6 +522,133 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest?projec
 }
 ```
 
+#### `GET /sessions/:id/messages/chat/user/first`
+
+Get the first user chat message from a session. Excludes `tool_result` and returns only pure user messages.
+
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
+**Request:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/user/first
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/user/first?projectPath=/path/to/project"
+```
+
+**Response:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "user",
+    "content": "Hello, please help me with my code",
+    "timestamp": "2026-03-01T12:00:00.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/user/latest`
+
+Get the latest user chat message from a session. Excludes `tool_result` and returns only pure user messages.
+
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
+**Request:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/user/latest
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/user/latest?projectPath=/path/to/project"
+```
+
+**Response:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "user",
+    "content": "Thank you",
+    "timestamp": "2026-03-01T12:01:00.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/assistant/first`
+
+Get the first assistant chat message from a session. Excludes `tool_use` and returns only pure text responses.
+
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
+**Request:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/first
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/first?projectPath=/path/to/project"
+```
+
+**Response:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "assistant",
+    "content": "Hello! How can I help you?",
+    "timestamp": "2026-03-01T12:00:05.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/assistant/latest`
+
+Get the latest assistant chat message from a session. Excludes `tool_use` and returns only pure text responses.
+
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
+**Request:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest
+
+# With projectPath filter
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?projectPath=/path/to/project"
+```
+
+**Response:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "assistant",
+    "content": "You're welcome!",
+    "timestamp": "2026-03-01T12:01:05.000Z",
+    "usage": {
+      "input_tokens": 150,
+      "output_tokens": 20
+    }
+  }
+}
+```
+
+> **Difference from existing endpoints (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`):**
+> Existing endpoints filter by `role` only, so `tool_result` (user role) and `tool_use` (assistant role) may be included. The `chat` versions check content type and return only pure conversation messages.
+
 #### `WS /ws`
 
 WebSocket endpoint for real-time session events.
