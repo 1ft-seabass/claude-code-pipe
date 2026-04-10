@@ -522,6 +522,133 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/assistant/latest?projec
 }
 ```
 
+#### `GET /sessions/:id/messages/chat/user/first`
+
+セッションの最初のユーザーチャットメッセージを取得します。`tool_result` を除外し、純粋なユーザー発言のみを返します。
+
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/user/first
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/user/first?projectPath=/path/to/project"
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "user",
+    "content": "Hello, please help me with my code",
+    "timestamp": "2026-03-01T12:00:00.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/user/latest`
+
+セッションの最新のユーザーチャットメッセージを取得します。`tool_result` を除外し、純粋なユーザー発言のみを返します。
+
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/user/latest
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/user/latest?projectPath=/path/to/project"
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "user",
+    "content": "Thank you",
+    "timestamp": "2026-03-01T12:01:00.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/assistant/first`
+
+セッションの最初のアシスタントチャットメッセージを取得します。`tool_use` を除外し、純粋なテキスト応答のみを返します。
+
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/first
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/first?projectPath=/path/to/project"
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "assistant",
+    "content": "Hello! How can I help you?",
+    "timestamp": "2026-03-01T12:00:05.000Z"
+  }
+}
+```
+
+#### `GET /sessions/:id/messages/chat/assistant/latest`
+
+セッションの最新のアシスタントチャットメッセージを取得します。`tool_use` を除外し、純粋なテキスト応答のみを返します。
+
+**クエリパラメータ:**
+
+- `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest
+
+# projectPath フィルタ付き
+curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?projectPath=/path/to/project"
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "message": {
+    "role": "assistant",
+    "content": "You're welcome!",
+    "timestamp": "2026-03-01T12:01:05.000Z",
+    "usage": {
+      "input_tokens": 150,
+      "output_tokens": 20
+    }
+  }
+}
+```
+
+> **既存エンドポイント (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`) との違い:**
+> 既存エンドポイントは `role` のみでフィルタするため、`tool_result`（user role）や `tool_use`（assistant role）が含まれることがあります。`chat` 版は content type を確認し、純粋な会話メッセージのみを返します。
+
 #### `WS /ws`
 
 リアルタイムセッションイベント用の WebSocket エンドポイント。
