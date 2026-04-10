@@ -84,8 +84,8 @@ function startNewSession(prompt, options = {}) {
     // script コマンドで PTY を提供してバッファリングを回避
     const claudeCommand = `claude ${claudeArgs.map(arg => {
       // 引数にスペースや特殊文字が含まれる場合はクォートする
-      if (arg.includes(' ') || arg.includes('"') || arg.includes("'")) {
-        return `"${arg.replace(/"/g, '\\"')}"`;
+      if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
+        return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
       }
       return arg;
     }).join(' ')}`;
@@ -285,8 +285,8 @@ function sendToSession(sessionId, prompt, options = {}) {
   // script コマンドで PTY を提供してバッファリングを回避
   const claudeCommand = `claude ${claudeArgs.map(arg => {
     // 引数にスペースや特殊文字が含まれる場合はクォートする
-    if (arg.includes(' ') || arg.includes('"') || arg.includes("'")) {
-      return `"${arg.replace(/"/g, '\\"')}"`;
+    if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
+      return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
     }
     return arg;
   }).join(' ')}`;

@@ -142,8 +142,13 @@ class JSONLWatcher extends EventEmitter {
 
     this.watcher.on('add', async (filePath) => {
       console.log(`[watcher] File added: ${filePath}`);
-      // 新規ファイルは現在位置を記録して終わり（過去ログは読まない）
-      await this.recordCurrentPosition(filePath);
+      if (this.filePositions.has(filePath)) {
+        // 既存ファイル（start() で既にポジション記録済み）→ スキップ
+        return;
+      }
+      // watcher 起動後に新規作成されたファイル → 先頭から読む
+      this.filePositions.set(filePath, 0);
+      await this.processNewLines(filePath);
     });
 
     this.watcher.on('change', async (filePath) => {
