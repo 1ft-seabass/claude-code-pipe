@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.4] - 2026-04-10
+
+### Fixed
+- **Newline session separation bug**: Messages containing newlines (`\n`) caused shell to interpret them as command separators, splitting sessions and dropping CLI arguments (`--allowedTools`, `--model`, etc.)
+  - Fixed quoting logic in `src/sender.js` to wrap newline-containing arguments in double quotes
+- **First user message webhook miss**: Watcher's `add` event only recorded file position without reading content, causing the first user message to be missed by webhook
+
+### Added
+- **Chat message endpoints**: New endpoints that filter out tool interactions and return only pure conversation messages
+  - `GET /sessions/:id/messages/chat/user/first`
+  - `GET /sessions/:id/messages/chat/user/latest`
+  - `GET /sessions/:id/messages/chat/assistant/first`
+  - `GET /sessions/:id/messages/chat/assistant/latest`
+
+### Documentation
+- Added chat message endpoints documentation to DETAILS.md and DETAILS-ja.md
+
 ## [0.7.3] - 2026-04-07
 
 ### Added
@@ -106,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.7.4]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.4
 [0.7.3]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.3
 [0.7.2]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.2
 [0.7.1]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.1
