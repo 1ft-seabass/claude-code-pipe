@@ -548,6 +548,126 @@ function createApiRouter(watchDir, config) {
     }
   });
 
+  // チャットメッセージ判定ヘルパー（ツール操作を除外した純粋な会話メッセージ）
+  function isUserChat(event) {
+    const msg = event.message;
+    if (!msg || msg.role !== 'user') return false;
+    if (typeof msg.content === 'string') return true;
+    if (Array.isArray(msg.content)) {
+      return !msg.content.some(item => item.type === 'tool_result');
+    }
+    return true;
+  }
+
+  function isAssistantChat(event) {
+    const msg = event.message;
+    if (!msg || msg.role !== 'assistant') return false;
+    if (!Array.isArray(msg.content)) return false;
+    const hasText = msg.content.some(item => item.type === 'text');
+    const hasToolUse = msg.content.some(item => item.type === 'tool_use');
+    return hasText && !hasToolUse;
+  }
+
+  // GET /sessions/:id/messages/chat/user/first - 最初のユーザーチャットメッセージ
+  router.get('/sessions/:id/messages/chat/user/first', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
+
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const events = await parseJSONLFile(jsonlPath);
+      const chatMessages = events.filter(isUserChat);
+
+      if (chatMessages.length === 0) {
+        return res.status(404).json({ error: 'No user chat messages found' });
+      }
+
+      res.json({ sessionId, message: chatMessages[0] });
+    } catch (error) {
+      console.error('[api] Error getting first user chat message:', error);
+      res.status(500).json({ error: 'Failed to get first user chat message' });
+    }
+  });
+
+  // GET /sessions/:id/messages/chat/user/latest - 最後のユーザーチャットメッセージ
+  router.get('/sessions/:id/messages/chat/user/latest', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
+
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const events = await parseJSONLFile(jsonlPath);
+      const chatMessages = events.filter(isUserChat);
+
+      if (chatMessages.length === 0) {
+        return res.status(404).json({ error: 'No user chat messages found' });
+      }
+
+      res.json({ sessionId, message: chatMessages[chatMessages.length - 1] });
+    } catch (error) {
+      console.error('[api] Error getting latest user chat message:', error);
+      res.status(500).json({ error: 'Failed to get latest user chat message' });
+    }
+  });
+
+  // GET /sessions/:id/messages/chat/assistant/first - 最初のアシスタントチャットメッセージ
+  router.get('/sessions/:id/messages/chat/assistant/first', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
+
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const events = await parseJSONLFile(jsonlPath);
+      const chatMessages = events.filter(isAssistantChat);
+
+      if (chatMessages.length === 0) {
+        return res.status(404).json({ error: 'No assistant chat messages found' });
+      }
+
+      res.json({ sessionId, message: chatMessages[0] });
+    } catch (error) {
+      console.error('[api] Error getting first assistant chat message:', error);
+      res.status(500).json({ error: 'Failed to get first assistant chat message' });
+    }
+  });
+
+  // GET /sessions/:id/messages/chat/assistant/latest - 最後のアシスタントチャットメッセージ
+  router.get('/sessions/:id/messages/chat/assistant/latest', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
+
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const events = await parseJSONLFile(jsonlPath);
+      const chatMessages = events.filter(isAssistantChat);
+
+      if (chatMessages.length === 0) {
+        return res.status(404).json({ error: 'No assistant chat messages found' });
+      }
+
+      res.json({ sessionId, message: chatMessages[chatMessages.length - 1] });
+    } catch (error) {
+      console.error('[api] Error getting latest assistant chat message:', error);
+      res.status(500).json({ error: 'Failed to get latest assistant chat message' });
+    }
+  });
+
   // POST /sessions/new - 新規セッション作成
   router.post('/sessions/new', async (req, res) => {
     try {
