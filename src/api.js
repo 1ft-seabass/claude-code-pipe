@@ -725,7 +725,13 @@ function createApiRouter(watchDir, config) {
       res.json({
         message: 'Session started',
         sessionId: result.sessionId,
-        pid: result.pid
+        pid: result.pid,
+        model: result.model,
+        cwd: result.cwd,
+        permissionMode: result.permissionMode,
+        claudeCodeVersion: result.claudeCodeVersion,
+        apiKeySource: result.apiKeySource,
+        tools: result.tools
       });
     } catch (error) {
       console.error('[api] Error starting new session:', error);
@@ -833,7 +839,7 @@ function createApiRouter(watchDir, config) {
         : defaultDangerouslySkipPermissions;
 
       // sendToSession を呼び出し
-      const result = sendToSession(sessionId, prompt, {
+      const result = await sendToSession(sessionId, prompt, {
         cwd: workingDirectory,
         allowedTools: allowedTools || [],
         disallowedTools: disallowedTools || [],
@@ -846,6 +852,11 @@ function createApiRouter(watchDir, config) {
         success: true,
         sessionId: result.sessionId,
         pid: result.pid,
+        model: result.model,
+        cwd: result.cwd,
+        permissionMode: result.permissionMode,
+        claudeCodeVersion: result.claudeCodeVersion,
+        apiKeySource: result.apiKeySource,
         message: 'Message sent successfully'
       });
     } catch (error) {

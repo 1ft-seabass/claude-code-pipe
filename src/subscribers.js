@@ -209,7 +209,8 @@ function handleProcessEvent(subscriber, eventType, event, serverInfo) {
       ...(event.code !== undefined && { code: event.code }),
       ...(event.signal !== undefined && { signal: event.signal }),
       ...(event.error !== undefined && { error: event.error }),
-      ...(event.resumed !== undefined && { resumed: event.resumed })
+      ...(event.resumed !== undefined && { resumed: event.resumed }),
+      ...(event.model !== undefined && { model: event.model })
     };
     postToSubscriber(url, payload, authorization, label);
   }

@@ -704,9 +704,18 @@ curl -X POST http://localhost:3100/sessions/new \
 ```json
 {
   "message": "Session started",
-  "sessionId": "01234567-89ab-cdef-0123-456789abcdef"
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "pid": 12345,
+  "model": "claude-sonnet-4-6",
+  "cwd": "/path/to/project",
+  "permissionMode": "default",
+  "claudeCodeVersion": "2.1.84",
+  "apiKeySource": "none",
+  "tools": ["Bash", "Read", "Write", "Grep"]
 }
 ```
+
+> **Note:** `model` reflects the actual model used by Claude Code, which may differ from the requested model. `tools` reflects the result of `allowedTools`/`disallowedTools` filtering.
 
 #### `POST /sessions/:id/send`
 
@@ -744,9 +753,17 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
   "success": true,
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
   "pid": 12345,
+  "model": "claude-sonnet-4-6",
+  "cwd": "/path/to/project",
+  "permissionMode": "default",
+  "claudeCodeVersion": "2.1.84",
+  "apiKeySource": "none",
+  "tools": ["Bash", "Read", "Write", "Grep"],
   "message": "Message sent successfully"
 }
 ```
+
+> **Note:** `model` reflects the actual model used for this turn. Specifying `model` in the request body does not guarantee the same model will be used in future turns unless specified again.
 
 ### Cancel Mode
 
@@ -1117,6 +1134,7 @@ Additional fields depend on `includeMessage` setting.
   "callbackUrl": "http://claude-code-pipe:3100",
   "projectTitle": "My Application",
   "pid": 12345,
+  "model": "claude-sonnet-4-6",
   "source": "sender"
 }
 ```

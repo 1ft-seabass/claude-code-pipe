@@ -143,6 +143,14 @@ function startNewSession(prompt, options = {}) {
               const json = JSON.parse(line);
               if (json.type === 'system' && json.subtype === 'init' && json.session_id) {
                 actualSessionId = json.session_id;
+                const initInfo = {
+                  model: json.model || null,
+                  cwd: json.cwd || null,
+                  permissionMode: json.permissionMode || null,
+                  claudeCodeVersion: json.claude_code_version || null,
+                  apiKeySource: json.apiKeySource || null,
+                  tools: json.tools || [],
+                };
                 firstLineReceived = true;
 
                 // 一時IDから実際のセッションIDに移行
@@ -156,17 +164,18 @@ function startNewSession(prompt, options = {}) {
                   sessionStartTimeout = null;
                 }
 
-                console.log(`[sender] Started new session: sessionId=${actualSessionId}, pid=${pid}`);
+                console.log(`[sender] Started new session: sessionId=${actualSessionId}, pid=${pid}, model=${initInfo.model}`);
 
                 // session-started イベント発行
                 processEvents.emit('session-started', {
                   sessionId: actualSessionId,
                   pid,
                   timestamp: new Date().toISOString(),
-                  projectPath: projectPath || null
+                  projectPath: projectPath || null,
+                  model: initInfo.model
                 });
 
-                resolve({ pid, sessionId: actualSessionId });
+                resolve({ pid, sessionId: actualSessionId, ...initInfo });
                 break;
               }
             }
@@ -258,116 +267,178 @@ function startNewSession(prompt, options = {}) {
  */
 function sendToSession(sessionId, prompt, options = {}) {
   const { cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
-  // Windows (non-WSL) チェック
-  if (isWindowsNonWSL()) {
-    throw new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
-  }
-
-  // claude コマンドの引数を構築
-  let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
-
-  if (allowedTools && allowedTools.length > 0) {
-    claudeArgs.push('--allowedTools', allowedTools.join(' '));
-  }
-
-  if (disallowedTools && disallowedTools.length > 0) {
-    claudeArgs.push('--disallowedTools', disallowedTools.join(' '));
-  }
-
-  if (model) {
-    claudeArgs.push('--model', model);
-  }
-
-  if (dangerouslySkipPermissions) {
-    claudeArgs.push('--dangerously-skip-permissions');
-  }
-
-  // script コマンドで PTY を提供してバッファリングを回避
-  const claudeCommand = `claude ${claudeArgs.map(arg => {
-    // 引数にスペースや特殊文字が含まれる場合はクォートする
-    if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
-      return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return new Promise((resolve, reject) => {
+    // Windows (non-WSL) チェック
+    if (isWindowsNonWSL()) {
+      reject(new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.'));
+      return;
     }
-    return arg;
-  }).join(' ')}`;
 
-  const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
-    cwd: cwd,
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
+    // claude コマンドの引数を構築
+    let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
 
-  const pid = proc.pid;
-
-  // 既存のセッションIDを上書き（同一セッションIDで新しいプロセス）
-  managedProcesses.set(sessionId, {
-    proc,
-    pid,
-    startedAt: new Date(),
-    projectPath: projectPath || null
-  });
-
-  console.log(`[sender] Sent to existing session: sessionId=${sessionId}, pid=${pid}`);
-
-  // session-started イベント発行（既存セッション再開）
-  processEvents.emit('session-started', {
-    sessionId,
-    pid,
-    timestamp: new Date().toISOString(),
-    resumed: true,
-    projectPath: projectPath || null
-  });
-
-  // stdout をコールバックに流す
-  proc.stdout.on('data', (data) => {
-    if (onData) {
-      onData(data.toString());
+    if (allowedTools && allowedTools.length > 0) {
+      claudeArgs.push('--allowedTools', allowedTools.join(' '));
     }
-  });
 
-  // stderr をコールバックに流す
-  proc.stderr.on('data', (data) => {
-    if (onError) {
-      onError(data.toString());
+    if (disallowedTools && disallowedTools.length > 0) {
+      claudeArgs.push('--disallowedTools', disallowedTools.join(' '));
     }
-  });
 
-  // プロセス終了時の処理
-  proc.on('exit', (code, signal) => {
-    console.log(`[sender] Process exited: sessionId=${sessionId}, pid=${pid}, code=${code}, signal=${signal}`);
+    if (model) {
+      claudeArgs.push('--model', model);
+    }
 
-    // イベント発行
-    processEvents.emit('process-exit', {
-      sessionId,
+    if (dangerouslySkipPermissions) {
+      claudeArgs.push('--dangerously-skip-permissions');
+    }
+
+    // script コマンドで PTY を提供してバッファリングを回避
+    const claudeCommand = `claude ${claudeArgs.map(arg => {
+      // 引数にスペースや特殊文字が含まれる場合はクォートする
+      if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
+        return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+      }
+      return arg;
+    }).join(' ')}`;
+
+    const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
+      cwd: cwd,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    const pid = proc.pid;
+    let firstLineReceived = false;
+    let sendTimeout = null;
+
+    // 既存のセッションIDを上書き（同一セッションIDで新しいプロセス）
+    managedProcesses.set(sessionId, {
+      proc,
       pid,
-      code,
-      signal,
-      timestamp: new Date().toISOString(),
+      startedAt: new Date(),
       projectPath: projectPath || null
     });
 
-    managedProcesses.delete(sessionId);
-    if (onExit) {
-      onExit(code, signal);
-    }
-  });
+    // タイムアウト設定
+    sendTimeout = setTimeout(() => {
+      if (!firstLineReceived) {
+        const timeoutError = new Error('Session send timeout: Failed to retrieve init event');
+        console.error(`[sender] ${timeoutError.message}: sessionId=${sessionId}, pid=${pid}`);
 
-  // プロセス起動エラー
-  proc.on('error', (err) => {
-    console.error(`[sender] Failed to send to session: ${err.message}`);
+        processEvents.emit('session-timeout', {
+          sessionId,
+          pid,
+          timestamp: new Date().toISOString(),
+          error: timeoutError.message,
+          projectPath: projectPath || null
+        });
 
-    // session-error イベント発行
-    processEvents.emit('session-error', {
-      sessionId,
-      pid,
-      timestamp: new Date().toISOString(),
-      error: err.message,
-      projectPath: projectPath || null
+        proc.kill();
+        managedProcesses.delete(sessionId);
+        reject(timeoutError);
+      }
+    }, SESSION_START_TIMEOUT_MS);
+
+    // stdout をコールバックに流す
+    proc.stdout.on('data', (data) => {
+      const dataStr = data.toString();
+
+      // 最初の行から init イベントのモデルを抽出
+      if (!firstLineReceived) {
+        try {
+          const lines = dataStr.split('\n');
+          for (const line of lines) {
+            if (line.trim()) {
+              const json = JSON.parse(line);
+              if (json.type === 'system' && json.subtype === 'init') {
+                const initInfo = {
+                  model: json.model || null,
+                  cwd: json.cwd || null,
+                  permissionMode: json.permissionMode || null,
+                  claudeCodeVersion: json.claude_code_version || null,
+                  apiKeySource: json.apiKeySource || null,
+                  tools: json.tools || [],
+                };
+                firstLineReceived = true;
+                if (sendTimeout) {
+                  clearTimeout(sendTimeout);
+                  sendTimeout = null;
+                }
+                console.log(`[sender] Sent to existing session: sessionId=${sessionId}, pid=${pid}, model=${initInfo.model}`);
+
+                // session-started イベント発行（既存セッション再開、init 後に model を含めて発行）
+                processEvents.emit('session-started', {
+                  sessionId,
+                  pid,
+                  timestamp: new Date().toISOString(),
+                  resumed: true,
+                  projectPath: projectPath || null,
+                  model: initInfo.model
+                });
+
+                resolve({ pid, sessionId, ...initInfo });
+                break;
+              }
+            }
+          }
+        } catch (err) {
+          // JSONパースエラーは無視
+        }
+      }
+
+      if (onData) {
+        onData(dataStr);
+      }
     });
 
-    managedProcesses.delete(sessionId);
-  });
+    // stderr をコールバックに流す
+    proc.stderr.on('data', (data) => {
+      if (onError) {
+        onError(data.toString());
+      }
+    });
 
-  return { pid, sessionId };
+    // プロセス終了時の処理
+    proc.on('exit', (code, signal) => {
+      console.log(`[sender] Process exited: sessionId=${sessionId}, pid=${pid}, code=${code}, signal=${signal}`);
+
+      // イベント発行
+      processEvents.emit('process-exit', {
+        sessionId,
+        pid,
+        code,
+        signal,
+        timestamp: new Date().toISOString(),
+        projectPath: projectPath || null
+      });
+
+      managedProcesses.delete(sessionId);
+      if (onExit) {
+        onExit(code, signal);
+      }
+
+      if (!firstLineReceived) {
+        reject(new Error('Failed to retrieve init event from claude command'));
+      }
+    });
+
+    // プロセス起動エラー
+    proc.on('error', (err) => {
+      console.error(`[sender] Failed to send to session: ${err.message}`);
+
+      // session-error イベント発行
+      processEvents.emit('session-error', {
+        sessionId,
+        pid,
+        timestamp: new Date().toISOString(),
+        error: err.message,
+        projectPath: projectPath || null
+      });
+
+      managedProcesses.delete(sessionId);
+      reject(err);
+    });
+  });
 }
 
 /**

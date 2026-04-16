@@ -5,6 +5,21 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.7.5] - 2026-04-16
+
+### 追加
+- **Send API レスポンスへの init イベント情報追加**: `POST /sessions/new` と `POST /sessions/:id/send` が Claude Code の init イベント情報を返すようになりました
+  - `model`: 実際に使用されたモデル（例: `"claude-sonnet-4-6"`, `"claude-opus-4-6[1m]"`）— 指定したモデルが実際に適用されたか観測できます
+  - `cwd`: Claude Code が認識した作業ディレクトリ
+  - `permissionMode`: 権限モード（例: `"default"`）
+  - `claudeCodeVersion`: Claude Code CLI バージョン
+  - `apiKeySource`: API キーのソース
+  - `tools`: 利用可能なツール一覧（`allowedTools`/`disallowedTools` のフィルタリング結果を反映）
+- **`session-started` webhook へのモデル情報追加**: `session-started` webhook ペイロードに `model` フィールドを追加
+
+### 修正
+- **送信タイムアウト**: `POST /sessions/:id/send` に 60 秒タイムアウトを追加（`POST /sessions/new` と同様）。Claude Code プロセスが init イベントを送出しない場合に無限待ちになる問題を解消
+
 ## [0.7.4] - 2026-04-10
 
 ### 修正
