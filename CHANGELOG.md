@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.5] - 2026-04-16
+
+### Added
+- **Init event info in Send API responses**: `POST /sessions/new` and `POST /sessions/:id/send` now return detailed info from Claude Code's init event
+  - `model`: Actual model used (e.g., `"claude-sonnet-4-6"`, `"claude-opus-4-6[1m]"`) — enables observing whether the specified model was actually applied
+  - `cwd`: Working directory reported by Claude Code
+  - `permissionMode`: Permission mode (e.g., `"default"`)
+  - `claudeCodeVersion`: Claude Code CLI version
+  - `apiKeySource`: API key source
+  - `tools`: List of available tools (reflects `allowedTools`/`disallowedTools` filtering)
+- **Model info in `session-started` webhook**: `model` field added to `session-started` webhook payload
+
+### Fixed
+- **Send timeout**: `POST /sessions/:id/send` now has a 60-second timeout (same as `POST /sessions/new`) to prevent indefinite hanging when Claude Code process fails to emit init event
+
 ## [0.7.4] - 2026-04-10
 
 ### Fixed
