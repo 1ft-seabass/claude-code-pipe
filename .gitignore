@@ -152,3 +152,6 @@ logs/
 
 # PM2 runtime data
 .pm2/
+
+# pre-commit 実行ログ（ローカル専用）
+.logs/

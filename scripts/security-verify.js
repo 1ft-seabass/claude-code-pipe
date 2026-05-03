@@ -77,28 +77,28 @@ const gitleaksTomlExists = fileExists('gitleaks.toml');
 checkResult(gitleaksTomlExists, 'gitleaks.toml' + (!gitleaksTomlExists ? ' — ファイルが見つかりません' : ''));
 checks.existence.push({ name: 'gitleaks.toml', exists: gitleaksTomlExists });
 
-// 3. .husky/pre-commit
-const huskyPrecommitExists = fileExists('.husky/pre-commit');
-checkResult(huskyPrecommitExists, '.husky/pre-commit' + (!huskyPrecommitExists ? ' — ファイルが見つかりません' : ''));
-checks.existence.push({ name: '.husky/pre-commit', exists: huskyPrecommitExists });
+// 3. .git/hooks/pre-commit
+const gitHookExists = fileExists('.git/hooks/pre-commit');
+checkResult(gitHookExists, '.git/hooks/pre-commit' + (!gitHookExists ? ' — ファイルが見つかりません（npx simple-git-hooks を実行してください）' : ''));
+checks.existence.push({ name: '.git/hooks/pre-commit', exists: gitHookExists });
 
-// 4. package.json の lint-staged 設定
+// 4. package.json の simple-git-hooks 設定
 const packageJsonExists = fileExists('package.json');
-let lintStagedExists = false;
+let simpleGitHooksExists = false;
 let packageJsonData = null;
 if (packageJsonExists) {
   const packageJson = readFile('package.json');
   if (packageJson) {
     try {
       packageJsonData = JSON.parse(packageJson);
-      lintStagedExists = !!packageJsonData['lint-staged'];
+      simpleGitHooksExists = !!packageJsonData['simple-git-hooks'];
     } catch (e) {
       // parse error
     }
   }
 }
-checkResult(lintStagedExists, 'package.json lint-staged 設定' + (!lintStagedExists ? ' — 設定が見つかりません' : ''));
-checks.existence.push({ name: 'lint-staged', exists: lintStagedExists });
+checkResult(simpleGitHooksExists, 'package.json simple-git-hooks 設定' + (!simpleGitHooksExists ? ' — 設定が見つかりません' : ''));
+checks.existence.push({ name: 'simple-git-hooks', exists: simpleGitHooksExists });
 
 // 5. package.json の npm scripts
 const requiredScripts = [
@@ -152,13 +152,13 @@ if (gitleaksTomlExists) {
   checkResult(false, 'gitleaks.toml — 存在チェックが ❌ のためスキップ', 'skip');
 }
 
-// 8. .husky/pre-commit の内容
-if (huskyPrecommitExists) {
-  const precommit = readFile('.husky/pre-commit');
-  const hasSecretlint = precommit && (precommit.includes('secretlint') || precommit.includes('lint-staged'));
-  checkResult(hasSecretlint, '.husky/pre-commit に secretlint/lint-staged' + (hasSecretlint ? ' あり' : ' が含まれていません'));
+// 8. .git/hooks/pre-commit の内容
+if (gitHookExists) {
+  const precommit = readFile('.git/hooks/pre-commit');
+  const hasPreCommitJs = precommit && precommit.includes('pre-commit.js');
+  checkResult(hasPreCommitJs, '.git/hooks/pre-commit に pre-commit.js' + (hasPreCommitJs ? ' あり' : ' が含まれていません'));
 } else {
-  checkResult(false, '.husky/pre-commit — 存在チェックが ❌ のためスキップ', 'skip');
+  checkResult(false, '.git/hooks/pre-commit — 存在チェックが ❌ のためスキップ', 'skip');
 }
 
 console.log('');
@@ -176,15 +176,7 @@ if (secretlintVersion) {
   checkResult(false, 'secretlint — コマンドが見つかりません');
 }
 
-// 10. lint-staged
-const lintStagedVersion = execCommand('npx lint-staged --version');
-if (lintStagedVersion) {
-  checkResult(true, `lint-staged ${lintStagedVersion}`);
-} else {
-  checkResult(false, 'lint-staged — コマンドが見つかりません');
-}
-
-// 11. gitleaks バイナリ（bin/gitleaks のみをチェック）
+// 10. gitleaks バイナリ（bin/gitleaks のみをチェック）
 const isWindows = process.platform === 'win32';
 const binaryName = isWindows ? 'gitleaks.exe' : 'gitleaks';
 const localBinary = path.join(process.cwd(), 'bin', binaryName);
@@ -198,7 +190,34 @@ if (fs.existsSync(localBinary)) {
     checkResult(false, `gitleaks — bin/${binaryName} が実行できません（実行権限またはバイナリが壊れている可能性）`);
   }
 } else {
-  checkResult(false, `gitleaks — bin/${binaryName} が見つかりません（node tmp/security-setup/templates/scripts/install-gitleaks.js で導入してください）`);
+  checkResult(false, `gitleaks — bin/${binaryName} が見つかりません（node scripts/install-gitleaks.js で導入してください）`);
+}
+
+// 11. 実行ログの最終確認
+const logFile = path.join(process.cwd(), '.logs', 'pre-commit.log');
+if (fs.existsSync(logFile)) {
+  const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
+  if (lines.length > 0) {
+    try {
+      const last = JSON.parse(lines[lines.length - 1]);
+      const date = new Date(last.timestamp);
+      const daysDiff = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+      const dateStr = last.timestamp.slice(0, 10);
+      if (daysDiff === 0) {
+        checkResult(true, `実行ログ — 最終実行: ${dateStr} 本日 (${last.result})`);
+      } else if (daysDiff <= 7) {
+        checkResult(true, `実行ログ — 最終実行: ${dateStr} ${daysDiff}日前 (${last.result})`);
+      } else {
+        checkResult(false, `実行ログ — 最終実行: ${dateStr} ${daysDiff}日前 (${last.result}) — 長期間動いていない可能性`, 'warning');
+      }
+    } catch (e) {
+      checkResult(false, '実行ログ — 解析エラー');
+    }
+  } else {
+    checkResult(false, '実行ログ — ログが空です（一度も動いていない可能性）');
+  }
+} else {
+  checkResult(false, '実行ログ — .logs/pre-commit.log が見つかりません（一度もコミットしていない可能性）');
 }
 
 console.log('');
@@ -233,9 +252,7 @@ if (testRun || simpleRun) {
 
   // secretlint テスト
   console.log('[secretlint テスト]');
-  const secretlintCmd = simpleRun
-    ? 'npx lint-staged --diff="git diff --cached --name-only"'
-    : './node_modules/.bin/secretlint "**/*"';
+  const secretlintCmd = 'npx secretlint "**/*"';
   console.log(`  ${secretlintCmd}`);
   try {
     const output = execSync(secretlintCmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
@@ -246,7 +263,6 @@ if (testRun || simpleRun) {
     const output = e.stdout || e.stderr || e.message;
     testResults.secretlint.output = output;
 
-    // Parse secretlint output to count errors
     const lines = output.split('\n');
     const errorCount = lines.filter(line => line.includes('Error:')).length;
 
@@ -288,7 +304,6 @@ if (testRun || simpleRun) {
       const output = e.stdout || e.stderr || e.message;
       testResults.gitleaks.output = output;
 
-      // Check if it's actually a detection (exit code 1) vs error
       if (e.status === 1 && output.includes('Finding:')) {
         const findings = (output.match(/Finding:/g) || []).length;
         console.log(`  → ⚠️  ${findings} 件検出`);
@@ -309,7 +324,6 @@ if (testRun || simpleRun) {
 
   console.log('\n================================');
 
-  // テストラン結果サマリー
   const secretlintOk = testResults.secretlint.passed;
   const gitleaksOk = !gitleaksVersion || testResults.gitleaks.passed;
 
@@ -321,6 +335,5 @@ if (testRun || simpleRun) {
     process.exit(0);
   }
 } else {
-  // 通常モード（--test-run なし）
   process.exit(0);
 }

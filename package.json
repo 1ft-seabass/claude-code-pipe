@@ -20,7 +20,7 @@
     "secret-scan:full": "secretlint \"**/*\" && ./bin/gitleaks detect --source . -v --config gitleaks.toml",
     "sync-to-main": "node scripts/sync-to-main.js",
     "commit-main": "node scripts/commit-main.js",
-    "prepare": "husky"
+    "postinstall": "npx simple-git-hooks"
   },
   "keywords": [
     "claude",
@@ -37,12 +37,10 @@
   },
   "devDependencies": {
     "@secretlint/secretlint-rule-preset-recommend": "^11.3.1",
-    "husky": "^9.1.7",
-    "secretlint": "^11.3.1"
+    "secretlint": "^11.3.1",
+    "simple-git-hooks": "^2.13.1"
   },
-  "lint-staged": {
-    "*": [
-      "secretlint"
-    ]
+  "simple-git-hooks": {
+    "pre-commit": "node scripts/pre-commit.js"
   }
 }
