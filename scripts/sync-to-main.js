@@ -222,6 +222,7 @@ function cleanPackageJson(mainPath) {
       'prepare',           // husky
       'sync-to-main',      // このスクリプト自体
       'commit-main',       // 開発用コミットウィザード
+      'postinstall',       // simple-git-hooks セットアップ（開発用）
     ];
 
     scriptsToRemove.forEach(script => {
@@ -252,6 +253,12 @@ function cleanPackageJson(mainPath) {
   if (pkg['lint-staged']) {
     log('   Removing lint-staged config', 'cyan');
     delete pkg['lint-staged'];
+  }
+
+  // simple-git-hooks 設定を削除（開発用）
+  if (pkg['simple-git-hooks']) {
+    log('   Removing simple-git-hooks config', 'cyan');
+    delete pkg['simple-git-hooks'];
   }
 
   // 整形して保存
