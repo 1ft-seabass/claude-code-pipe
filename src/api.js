@@ -7,6 +7,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
@@ -863,6 +864,38 @@ function createApiRouter(watchDir, config) {
     } catch (error) {
       console.error('[api] Error sending message:', error);
       res.status(500).json({ error: 'Failed to send message' });
+    }
+  });
+
+  // POST /images - ファイルを /tmp/claude-code-pipe/ に保存
+  // body: { data: base64文字列, filename: "photo.png" }
+  router.post('/images', (req, res) => {
+    const { data, filename } = req.body;
+    if (!data || !filename) {
+      return res.status(400).json({ error: 'data and filename are required' });
+    }
+
+    const ext = path.extname(filename).toLowerCase();
+    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md'];
+    if (!allowed.includes(ext)) {
+      return res.status(400).json({ error: `File type not allowed. Allowed: ${allowed.join(', ')}` });
+    }
+
+    const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const tmpDir = '/tmp/claude-code-pipe';
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const uuid = crypto.randomUUID();
+    const savedFilename = `${uuid}-${safeName}`;
+    const filePath = path.join(tmpDir, savedFilename);
+
+    try {
+      const buffer = Buffer.from(data, 'base64');
+      fs.writeFileSync(filePath, buffer);
+      res.json({ path: filePath, filename: savedFilename });
+    } catch (error) {
+      console.error('[api] Error saving image:', error);
+      res.status(500).json({ error: 'Failed to save file' });
     }
   });
 
