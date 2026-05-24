@@ -11,6 +11,7 @@ const { spawn } = require('child_process');
 const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
 const { startNewSession, sendToSession, getManagedProcesses, killProcess, killAllProcesses } = require('./sender');
+const { getGitStatus, getGitLog } = require('./git-info');
 
 // package.json を読み込み
 const packageJson = require('../package.json');
@@ -863,6 +864,45 @@ function createApiRouter(watchDir, config) {
       console.error('[api] Error sending message:', error);
       res.status(500).json({ error: 'Failed to send message' });
     }
+  });
+
+  // GET /git/status?projectPath=...&files=true - Git ステータス
+  // デフォルトはカウントのみ、?files=true でファイル一覧を含む
+  router.get('/git/status', (req, res) => {
+    const projectPath = req.query.projectPath;
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+    const result = getGitStatus(projectPath);
+    if (!result) {
+      return res.status(404).json({ error: 'Not a git repository' });
+    }
+    if (req.query.files === 'true') {
+      return res.json(result);
+    }
+    res.json({
+      branch: result.branch,
+      ahead: result.ahead,
+      behind: result.behind,
+      stagedCount: result.staged.length,
+      unstagedCount: result.unstaged.length,
+      untrackedCount: result.untracked.length,
+      isClean: result.isClean
+    });
+  });
+
+  // GET /git/log?projectPath=...&limit=20 - Git ログ（未プッシュ含む）
+  router.get('/git/log', (req, res) => {
+    const projectPath = req.query.projectPath;
+    if (!projectPath) {
+      return res.status(400).json({ error: 'projectPath is required' });
+    }
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const result = getGitLog(projectPath, limit);
+    if (!result) {
+      return res.status(404).json({ error: 'Not a git repository' });
+    }
+    res.json(result);
   });
 
   return router;

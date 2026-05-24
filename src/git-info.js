@@ -111,8 +111,105 @@ function detectMainWorktree() {
   }
 }
 
+/**
+ * Git ステータス情報を取得
+ * @param {string} projectPath - プロジェクトのフルパス
+ * @returns {object|null}
+ */
+function getGitStatus(projectPath) {
+  if (!projectPath) return null;
+
+  const isGitRepo = execGitCommand('git rev-parse --git-dir', projectPath);
+  if (!isGitRepo) return null;
+
+  const branch = execGitCommand('git branch --show-current', projectPath);
+
+  // ahead/behind
+  let ahead = 0;
+  let behind = 0;
+  const aheadBehind = execGitCommand('git rev-list --left-right --count HEAD...@{u}', projectPath);
+  if (aheadBehind) {
+    const parts = aheadBehind.split('\t');
+    ahead = parseInt(parts[0], 10) || 0;
+    behind = parseInt(parts[1], 10) || 0;
+  }
+
+  // porcelain でファイル一覧
+  const staged = [];
+  const unstaged = [];
+  const untracked = [];
+  const porcelain = execGitCommand('git status --porcelain', projectPath);
+  if (porcelain) {
+    for (const line of porcelain.split('\n')) {
+      if (!line) continue;
+      const xy = line.substring(0, 2);
+      const file = line.substring(3);
+      const x = xy[0]; // index
+      const y = xy[1]; // worktree
+      if (x !== ' ' && x !== '?') staged.push(file);
+      if (y !== ' ' && y !== '?') unstaged.push(file);
+      if (xy === '??') untracked.push(file);
+    }
+  }
+
+  return {
+    branch: branch || null,
+    ahead,
+    behind,
+    staged,
+    unstaged,
+    untracked,
+    isClean: staged.length === 0 && unstaged.length === 0 && untracked.length === 0
+  };
+}
+
+/**
+ * Git ログを取得
+ * @param {string} projectPath - プロジェクトのフルパス
+ * @param {number} limit - 取得件数
+ * @returns {object|null}
+ */
+function getGitLog(projectPath, limit = 20) {
+  if (!projectPath) return null;
+
+  const isGitRepo = execGitCommand('git rev-parse --git-dir', projectPath);
+  if (!isGitRepo) return null;
+
+  // unpushed コミットのハッシュ一覧
+  const unpushedRaw = execGitCommand('git rev-list HEAD @{u}..HEAD', projectPath);
+  const unpushedHashes = new Set(unpushedRaw ? unpushedRaw.split('\n').filter(Boolean) : []);
+
+  const logRaw = execGitCommand(
+    `git log -${limit} --format=%H%x1f%h%x1f%s%x1f%ai%x1f%an`,
+    projectPath
+  );
+
+  const commits = [];
+  if (logRaw) {
+    for (const line of logRaw.split('\n')) {
+      if (!line) continue;
+      const [hash, shortHash, message, date, author] = line.split('\x1f');
+      commits.push({
+        hash: shortHash,
+        fullHash: hash,
+        message,
+        date,
+        author,
+        unpushed: unpushedHashes.has(hash)
+      });
+    }
+  }
+
+  return {
+    commits,
+    unpushedCount: unpushedHashes.size
+  };
+}
+
 module.exports = {
   getGitInfo,
+  getGitStatus,
+  getGitLog,
   execGitCommand,      // テスト用にエクスポート
   detectMainWorktree   // 既存スクリプト用
 };
