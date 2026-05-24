@@ -34,6 +34,8 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 - **Send Mode**: Send prompts to Claude Code via REST API (creates `claude -p` processes)
 - **Cancel Mode**: Cancel running sessions programmatically
 - **Webhook Distribution**: Send session events to external services (e.g., Node-RED, Slack)
+- **Git Info API**: Get repository status and commit log for any project via REST API
+- **File Upload API**: Upload files (images, text, PDF) in base64 format for use in sessions
 
 ## Platform Support
 

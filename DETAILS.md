@@ -1032,6 +1032,176 @@ curl -X DELETE http://localhost:3100/processes
 | `killed` | number | Number of processes killed |
 | `message` | string | Status message |
 
+#### `GET /git/status`
+
+Get the Git status of a project directory.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `projectPath` | string | Yes | - | Path to the project directory |
+| `files` | boolean | No | `false` | Include full file lists (staged, unstaged, untracked) |
+
+**Request:**
+
+```bash
+# Count only (default)
+curl "http://localhost:3100/git/status?projectPath=/path/to/project"
+
+# With full file lists
+curl "http://localhost:3100/git/status?projectPath=/path/to/project&files=true"
+```
+
+**Response (default):**
+
+```json
+{
+  "branch": "main",
+  "ahead": 2,
+  "behind": 0,
+  "stagedCount": 1,
+  "unstagedCount": 2,
+  "untrackedCount": 0,
+  "isClean": false
+}
+```
+
+**Response (files=true):**
+
+```json
+{
+  "branch": "main",
+  "ahead": 2,
+  "behind": 0,
+  "stagedCount": 1,
+  "unstagedCount": 2,
+  "untrackedCount": 0,
+  "isClean": false,
+  "staged": ["src/api.js"],
+  "unstaged": ["src/sender.js", "README.md"],
+  "untracked": []
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `branch` | string | Current branch name |
+| `ahead` | number | Number of commits ahead of remote |
+| `behind` | number | Number of commits behind remote |
+| `stagedCount` | number | Number of staged files |
+| `unstagedCount` | number | Number of unstaged modified files |
+| `untrackedCount` | number | Number of untracked files |
+| `isClean` | boolean | `true` if working tree is clean |
+| `staged` | array | Staged file paths (only when `files=true`) |
+| `unstaged` | array | Unstaged file paths (only when `files=true`) |
+| `untracked` | array | Untracked file paths (only when `files=true`) |
+
+#### `GET /git/log`
+
+Get the Git commit log of a project directory.
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `projectPath` | string | Yes | - | Path to the project directory |
+| `limit` | number | No | `20` | Maximum number of commits to return |
+
+**Request:**
+
+```bash
+curl "http://localhost:3100/git/log?projectPath=/path/to/project&limit=5"
+```
+
+**Response:**
+
+```json
+{
+  "commits": [
+    {
+      "hash": "abc1234",
+      "subject": "feat: add new feature",
+      "author": "Your Name",
+      "date": "2026-05-24T04:00:00.000Z",
+      "unpushed": true
+    },
+    {
+      "hash": "def5678",
+      "subject": "fix: resolve bug",
+      "author": "Your Name",
+      "date": "2026-05-23T12:00:00.000Z",
+      "unpushed": false
+    }
+  ],
+  "unpushedCount": 1
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `commits` | array | List of commit objects |
+| `commits[].hash` | string | Short commit hash |
+| `commits[].subject` | string | Commit message subject |
+| `commits[].author` | string | Author name |
+| `commits[].date` | string | ISO 8601 commit date |
+| `commits[].unpushed` | boolean | `true` if this commit has not been pushed to remote |
+| `unpushedCount` | number | Total number of unpushed commits |
+
+#### `POST /images`
+
+Upload a file (image, text, PDF) encoded as base64. The file is saved to `/tmp/claude-code-pipe/` with a UUID prefix.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3100/images \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": "<base64-encoded-content>",
+    "filename": "screenshot.png"
+  }'
+```
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `data` | string | Yes | Base64-encoded file content |
+| `filename` | string | Yes | Original filename (used for extension validation and safe naming) |
+
+**Supported Extensions:** `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`
+
+**Response:**
+
+```json
+{
+  "path": "/tmp/claude-code-pipe/550e8400-e29b-41d4-a716-446655440000-screenshot.png",
+  "filename": "550e8400-e29b-41d4-a716-446655440000-screenshot.png"
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | string | Absolute path to the saved file |
+| `filename` | string | Saved filename (UUID prefix + sanitized original name) |
+
+**Error Responses:**
+
+```json
+{ "error": "Missing data or filename" }
+```
+
+```json
+{ "error": "File type not allowed" }
+```
+
 ---
 
 ## Webhook Event Format

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-05-24
+
+### Added
+- **Git status API**: `GET /git/status` returns branch, ahead/behind counts, and change statistics for a project
+  - `?files=true` query parameter to include full file lists (staged, unstaged, untracked)
+- **Git log API**: `GET /git/log` returns commit history with `unpushed` flag per commit and total `unpushedCount`
+  - `?limit=N` query parameter to control number of commits (default: 20)
+- **Image upload API**: `POST /images` accepts base64-encoded files and saves them to `/tmp/claude-code-pipe/`
+  - Supported types: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`
+  - Filename sanitization and UUID prefix for collision avoidance
+
+### Fixed
+- **Shell argument escaping**: Prompts containing backticks (`` ` ``) or `$` characters no longer cause shell expansion when sent via Send API
+  - All arguments are now wrapped in double quotes with proper escaping of `\`, `"`, `` ` ``, and `$`
+- **Git output leading whitespace**: Fixed `execGitCommand` stripping leading whitespace from multi-line output (`.trim()` → `.trimEnd()`)
+
 ## [0.7.5] - 2026-04-16
 
 ### Added
@@ -138,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.8.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.8.0
 [0.7.4]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.4
 [0.7.3]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.3
 [0.7.2]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.2

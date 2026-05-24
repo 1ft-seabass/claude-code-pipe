@@ -34,6 +34,8 @@ Claude Code の JSONL セッションファイルを監視し、REST API で操�
 - **Send Mode**: REST API 経由で Claude Code にプロンプトを送信（`claude -p` プロセスを作成）
 - **Cancel Mode**: 実行中のセッションをプログラムからキャンセル
 - **Webhook 配信**: セッションイベントを外部サービス（Node-RED、Slack など）に送信
+- **Git 情報 API**: REST API 経由でプロジェクトのリポジトリ状態・コミットログを取得
+- **ファイルアップロード API**: base64 形式で画像・テキスト・PDF をアップロードしてセッションで利用
 
 ## プラットフォーム対応
 

@@ -1032,6 +1032,176 @@ curl -X DELETE http://localhost:3100/processes
 | `killed` | number | 終了したプロセス数 |
 | `message` | string | ステータスメッセージ |
 
+#### `GET /git/status`
+
+プロジェクトディレクトリの Git ステータスを取得します。
+
+**クエリパラメータ:**
+
+| パラメータ | 型 | 必須 | デフォルト | 説明 |
+|-----------|------|----------|---------|-------------|
+| `projectPath` | string | Yes | - | プロジェクトディレクトリのパス |
+| `files` | boolean | No | `false` | ファイル一覧を含める（staged, unstaged, untracked） |
+
+**リクエスト:**
+
+```bash
+# カウントのみ（デフォルト）
+curl "http://localhost:3100/git/status?projectPath=/path/to/project"
+
+# ファイル一覧付き
+curl "http://localhost:3100/git/status?projectPath=/path/to/project&files=true"
+```
+
+**レスポンス（デフォルト）:**
+
+```json
+{
+  "branch": "main",
+  "ahead": 2,
+  "behind": 0,
+  "stagedCount": 1,
+  "unstagedCount": 2,
+  "untrackedCount": 0,
+  "isClean": false
+}
+```
+
+**レスポンス（files=true）:**
+
+```json
+{
+  "branch": "main",
+  "ahead": 2,
+  "behind": 0,
+  "stagedCount": 1,
+  "unstagedCount": 2,
+  "untrackedCount": 0,
+  "isClean": false,
+  "staged": ["src/api.js"],
+  "unstaged": ["src/sender.js", "README.md"],
+  "untracked": []
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `branch` | string | 現在のブランチ名 |
+| `ahead` | number | リモートより先のコミット数 |
+| `behind` | number | リモートより遅れているコミット数 |
+| `stagedCount` | number | ステージ済みファイル数 |
+| `unstagedCount` | number | 変更済み（未ステージ）ファイル数 |
+| `untrackedCount` | number | 未追跡ファイル数 |
+| `isClean` | boolean | ワーキングツリーがクリーンな場合 `true` |
+| `staged` | array | ステージ済みファイルのパス一覧（`files=true` のときのみ） |
+| `unstaged` | array | 未ステージファイルのパス一覧（`files=true` のときのみ） |
+| `untracked` | array | 未追跡ファイルのパス一覧（`files=true` のときのみ） |
+
+#### `GET /git/log`
+
+プロジェクトディレクトリの Git コミットログを取得します。
+
+**クエリパラメータ:**
+
+| パラメータ | 型 | 必須 | デフォルト | 説明 |
+|-----------|------|----------|---------|-------------|
+| `projectPath` | string | Yes | - | プロジェクトディレクトリのパス |
+| `limit` | number | No | `20` | 取得するコミットの最大件数 |
+
+**リクエスト:**
+
+```bash
+curl "http://localhost:3100/git/log?projectPath=/path/to/project&limit=5"
+```
+
+**レスポンス:**
+
+```json
+{
+  "commits": [
+    {
+      "hash": "abc1234",
+      "subject": "feat: 新機能を追加",
+      "author": "Your Name",
+      "date": "2026-05-24T04:00:00.000Z",
+      "unpushed": true
+    },
+    {
+      "hash": "def5678",
+      "subject": "fix: バグを修正",
+      "author": "Your Name",
+      "date": "2026-05-23T12:00:00.000Z",
+      "unpushed": false
+    }
+  ],
+  "unpushedCount": 1
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `commits` | array | コミットオブジェクトの一覧 |
+| `commits[].hash` | string | 短縮コミットハッシュ |
+| `commits[].subject` | string | コミットメッセージの件名 |
+| `commits[].author` | string | 作者名 |
+| `commits[].date` | string | ISO 8601 形式のコミット日時 |
+| `commits[].unpushed` | boolean | リモートに未プッシュのコミットの場合 `true` |
+| `unpushedCount` | number | 未プッシュのコミット総数 |
+
+#### `POST /images`
+
+base64 エンコードされたファイル（画像・テキスト・PDF）をアップロードします。ファイルは UUID プレフィックス付きで `/tmp/claude-code-pipe/` に保存されます。
+
+**リクエスト:**
+
+```bash
+curl -X POST http://localhost:3100/images \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": "<base64エンコードされたコンテンツ>",
+    "filename": "screenshot.png"
+  }'
+```
+
+**リクエストボディ:**
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `data` | string | Yes | base64 エンコードされたファイルコンテンツ |
+| `filename` | string | Yes | 元のファイル名（拡張子検証とサニタイズに使用） |
+
+**サポートされる拡張子:** `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`
+
+**レスポンス:**
+
+```json
+{
+  "path": "/tmp/claude-code-pipe/550e8400-e29b-41d4-a716-446655440000-screenshot.png",
+  "filename": "550e8400-e29b-41d4-a716-446655440000-screenshot.png"
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `path` | string | 保存されたファイルの絶対パス |
+| `filename` | string | 保存されたファイル名（UUID プレフィックス + サニタイズ済み元ファイル名） |
+
+**エラーレスポンス:**
+
+```json
+{ "error": "Missing data or filename" }
+```
+
+```json
+{ "error": "File type not allowed" }
+```
+
 ---
 
 ## Webhook イベントフォーマット
