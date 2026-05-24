@@ -20,7 +20,7 @@ function execGitCommand(command, cwd) {
       encoding: 'utf8',
       stdio: 'pipe'  // エラー出力を抑制
     });
-    return result.trim();
+    return result.trimEnd();
   } catch (error) {
     // git コマンドが失敗した場合は null を返す（graceful degradation）
     return null;
