@@ -82,13 +82,10 @@ function startNewSession(prompt, options = {}) {
     }
 
     // script コマンドで PTY を提供してバッファリングを回避
-    const claudeCommand = `claude ${claudeArgs.map(arg => {
-      // 引数にスペースや特殊文字が含まれる場合はクォートする
-      if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
-        return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-      }
-      return arg;
-    }).join(' ')}`;
+    // シェル展開を防ぐため全引数をダブルクォートで囲み \ " ` $ をエスケープする
+    const claudeCommand = `claude ${claudeArgs.map(arg =>
+      `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')}"`
+    ).join(' ')}`;
 
     const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
       cwd: cwd,
@@ -294,13 +291,10 @@ function sendToSession(sessionId, prompt, options = {}) {
     }
 
     // script コマンドで PTY を提供してバッファリングを回避
-    const claudeCommand = `claude ${claudeArgs.map(arg => {
-      // 引数にスペースや特殊文字が含まれる場合はクォートする
-      if (arg.includes(' ') || arg.includes('"') || arg.includes("'") || arg.includes('\n') || arg.includes('\r')) {
-        return `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-      }
-      return arg;
-    }).join(' ')}`;
+    // シェル展開を防ぐため全引数をダブルクォートで囲み \ " ` $ をエスケープする
+    const claudeCommand = `claude ${claudeArgs.map(arg =>
+      `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')}"`
+    ).join(' ')}`;
 
     const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
       cwd: cwd,
