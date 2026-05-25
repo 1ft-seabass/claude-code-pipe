@@ -28,5 +28,9 @@
   "send": {
     "defaultAllowedTools": ["Read", "LS", "Grep", "Write", "Bash"],
     "cancelTimeoutMs": 3000
+  },
+  "upload": {
+    "maxBodySize": "10mb",
+    "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
   }
 }
