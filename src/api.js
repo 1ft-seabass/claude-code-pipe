@@ -867,16 +867,24 @@ function createApiRouter(watchDir, config) {
     }
   });
 
-  // POST /images - ファイルを /tmp/claude-code-pipe/ に保存
+  // GET /attachments-config - アップロード設定を返す
+  router.get('/attachments-config', (req, res) => {
+    res.json({
+      maxBodySize: config.upload?.maxBodySize || '10mb',
+      allowedExtensions: config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md']
+    });
+  });
+
+  // POST /attachments - ファイルを /tmp/claude-code-pipe/ に保存
   // body: { data: base64文字列, filename: "photo.png" }
-  router.post('/images', (req, res) => {
+  router.post('/attachments', (req, res) => {
     const { data, filename } = req.body;
     if (!data || !filename) {
       return res.status(400).json({ error: 'data and filename are required' });
     }
 
     const ext = path.extname(filename).toLowerCase();
-    const allowed = ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md'];
+    const allowed = config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md'];
     if (!allowed.includes(ext)) {
       return res.status(400).json({ error: `File type not allowed. Allowed: ${allowed.join(', ')}` });
     }
@@ -894,7 +902,7 @@ function createApiRouter(watchDir, config) {
       fs.writeFileSync(filePath, buffer);
       res.json({ path: filePath, filename: savedFilename });
     } catch (error) {
-      console.error('[api] Error saving image:', error);
+      console.error('[api] Error saving attachment:', error);
       res.status(500).json({ error: 'Failed to save file' });
     }
   });

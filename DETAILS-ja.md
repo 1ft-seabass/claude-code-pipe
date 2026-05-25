@@ -1152,14 +1152,40 @@ curl "http://localhost:3100/git/log?projectPath=/path/to/project&limit=5"
 | `commits[].unpushed` | boolean | リモートに未プッシュのコミットの場合 `true` |
 | `unpushedCount` | number | 未プッシュのコミット総数 |
 
-#### `POST /images`
+#### `GET /attachments-config`
+
+現在のアップロード設定（受け入れ可能なファイルサイズと拡張子）を取得します。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/attachments-config
+```
+
+**レスポンス:**
+
+```json
+{
+  "maxBodySize": "10mb",
+  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `maxBodySize` | string | リクエストボディの最大サイズ（例: `"10mb"`） |
+| `allowedExtensions` | array | 許可されているファイル拡張子の一覧 |
+
+#### `POST /attachments`
 
 base64 エンコードされたファイル（画像・テキスト・PDF）をアップロードします。ファイルは UUID プレフィックス付きで `/tmp/claude-code-pipe/` に保存されます。
 
 **リクエスト:**
 
 ```bash
-curl -X POST http://localhost:3100/images \
+curl -X POST http://localhost:3100/attachments \
   -H "Content-Type: application/json" \
   -d '{
     "data": "<base64エンコードされたコンテンツ>",
@@ -1174,7 +1200,7 @@ curl -X POST http://localhost:3100/images \
 | `data` | string | Yes | base64 エンコードされたファイルコンテンツ |
 | `filename` | string | Yes | 元のファイル名（拡張子検証とサニタイズに使用） |
 
-**サポートされる拡張子:** `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`
+**サポートされる拡張子:** `config.upload.allowedExtensions` で設定可能（デフォルト: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`）
 
 **レスポンス:**
 

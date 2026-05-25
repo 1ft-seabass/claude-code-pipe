@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-05-25
+
+### Added
+- **Attachments config API**: `GET /attachments-config` returns current upload settings (`maxBodySize`, `allowedExtensions`) so viewers can display accepted file types and size limits
+- **Configurable upload settings**: New `upload` section in `config.json`
+  - `maxBodySize`: Maximum request body size (default: `"10mb"`)
+  - `allowedExtensions`: List of allowed file extensions (default: `[".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]`)
+
+### Changed
+- **Renamed `POST /images` → `POST /attachments`**: More accurate name for a general file attachment endpoint
+
 ## [0.8.0] - 2026-05-24
 
 ### Added
@@ -154,6 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.8.1]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.8.1
 [0.8.0]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.8.0
 [0.7.4]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.4
 [0.7.3]: https://github.com/1ft-seabass/claude-code-pipe/releases/tag/v0.7.3
