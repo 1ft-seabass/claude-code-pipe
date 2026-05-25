@@ -1152,14 +1152,40 @@ curl "http://localhost:3100/git/log?projectPath=/path/to/project&limit=5"
 | `commits[].unpushed` | boolean | `true` if this commit has not been pushed to remote |
 | `unpushedCount` | number | Total number of unpushed commits |
 
-#### `POST /images`
+#### `GET /attachments-config`
+
+Get the current upload configuration (accepted file size and extensions).
+
+**Request:**
+
+```bash
+curl http://localhost:3100/attachments-config
+```
+
+**Response:**
+
+```json
+{
+  "maxBodySize": "10mb",
+  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `maxBodySize` | string | Maximum request body size (e.g., `"10mb"`) |
+| `allowedExtensions` | array | List of allowed file extensions |
+
+#### `POST /attachments`
 
 Upload a file (image, text, PDF) encoded as base64. The file is saved to `/tmp/claude-code-pipe/` with a UUID prefix.
 
 **Request:**
 
 ```bash
-curl -X POST http://localhost:3100/images \
+curl -X POST http://localhost:3100/attachments \
   -H "Content-Type: application/json" \
   -d '{
     "data": "<base64-encoded-content>",
@@ -1174,7 +1200,7 @@ curl -X POST http://localhost:3100/images \
 | `data` | string | Yes | Base64-encoded file content |
 | `filename` | string | Yes | Original filename (used for extension validation and safe naming) |
 
-**Supported Extensions:** `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`
+**Supported Extensions:** configurable via `config.upload.allowedExtensions` (default: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`)
 
 **Response:**
 
