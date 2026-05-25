@@ -19,7 +19,7 @@ const { cancel } = require('./canceller');
 
 // Express アプリケーションを作成
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: config.upload?.maxBodySize || '10mb' }));
 
 // API トークン認証ミドルウェア
 function authMiddleware(req, res, next) {
