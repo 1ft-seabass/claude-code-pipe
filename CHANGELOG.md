@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-06-04
+
+### Fixed
+- **Project path extraction with hyphens**: `extractProjectPath` now reads the `cwd` field directly from the JSONL file, resolving project paths correctly even when usernames or directory names contain hyphens
+  - Previously, the fallback logic converted all hyphens to slashes (e.g., `seigo-tanaka` → `seigo/tanaka`), causing `ENOENT` errors in environments where the path could not be verified via `existsSync` (e.g., running outside Docker)
+  - New logic reads the first 2KB of the JSONL file to find a `cwd` field, which Claude Code writes reliably on every session
+  - Falls back to the existing `existsSync`-based candidate matching if the JSONL cannot be read or contains no `cwd` field
+
 ## [0.8.1] - 2026-05-25
 
 ### Added
