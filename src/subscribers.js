@@ -52,6 +52,34 @@ function extractProjectPath(jsonlFilePath) {
       return projectPathCache.get(projectDirName);
     }
 
+    // JSONL ファイルの先頭から cwd フィールドを探す（最も信頼性が高い方法）
+    // ハイフンを含むパスでも正確に復元できる
+    try {
+      const fd = fs.openSync(jsonlFilePath, 'r');
+      try {
+        const buffer = Buffer.alloc(2048);
+        const bytesRead = fs.readSync(fd, buffer, 0, 2048, 0);
+        const content = buffer.slice(0, bytesRead).toString('utf8');
+        const lines = content.split('\n');
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.cwd) {
+              projectPathCache.set(projectDirName, parsed.cwd);
+              return parsed.cwd;
+            }
+          } catch (e) {
+            // JSON パース失敗は無視して次の行へ
+          }
+        }
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch (e) {
+      // ファイル読み取り失敗は無視して既存ロジックにフォールバック
+    }
+
     // 先頭の "-" を削除
     const encoded = projectDirName.substring(1);
 
