@@ -8,21 +8,15 @@
     {
       "url": "http://localhost:1880/claude-event",
       "label": "node-red",
-      "level": "basic",
-      "includeMessage": true,
       "authorization": ""
     },
     {
       "url": "http://localhost:1880/claude-status",
-      "label": "led-trigger",
-      "level": "basic",
-      "includeMessage": false
+      "label": "led-trigger"
     },
     {
       "url": "http://localhost:3200/claude-stream",
-      "label": "dashboard",
-      "level": "full",
-      "includeMessage": true
+      "label": "dashboard"
     }
   ],
   "send": {

@@ -27,8 +27,6 @@ Complete documentation for claude-code-pipe.
     {
       "url": "http://localhost:1880/webhook",
       "label": "my-service",
-      "level": "basic",
-      "includeMessage": true,
       "authorization": ""
     }
   ],
@@ -60,9 +58,9 @@ Complete documentation for claude-code-pipe.
 |-------|------|----------|---------|-------------|
 | `url` | string | Yes | - | Webhook endpoint URL |
 | `label` | string | Yes | - | Label for identification in logs |
-| `level` | string | Yes | - | Event level: `basic` or `full` |
-| `includeMessage` | boolean | Yes | - | Include full message content in webhook payload |
 | `authorization` | string | No | `""` | Authorization header value (e.g., `Bearer YOUR_TOKEN`) |
+
+> **Note:** `level` and `includeMessage` fields are deprecated and ignored. All events and full message content are always delivered. Filter by event type or fields (`isSubagent`, `isMeta`) on the receiver side.
 
 #### Send Configuration
 
@@ -72,26 +70,19 @@ Complete documentation for claude-code-pipe.
 | `cancelTimeoutMs` | number | No | `3000` | Timeout in milliseconds for cancel operation |
 | `defaultDangerouslySkipPermissions` | boolean | No | `false` | **⚠️ DANGEROUS:** Default value for skipping permission confirmations. When `true`, all Send API requests will skip permission confirmations unless explicitly overridden. Use with extreme caution. See [Security Considerations](#security-considerations) for details. |
 
-### Webhook Levels
+### Webhook Delivery
 
-Choose the appropriate level based on your use case:
+All events and full message content are always delivered to every subscriber. Filter by `type`, `isSubagent`, or `isMeta` on the receiver side as needed.
 
-| level | includeMessage | Description | Use Case |
-|-------|---------------|-------------|----------|
-| `basic` | `false` | Minimal events, metadata only | Lightweight notifications (e.g., Slack) |
-| `basic` | `true` | Minimal events + full message | Standard usage (e.g., Node-RED) |
-| `full` | `false` | All events, metadata only | Debug/monitoring (metadata only) |
-| `full` | `true` | All events + full message | Complete logging |
+**Event Types:**
 
-**Event Types by Level:**
-
-- **basic**: `session-started`, `assistant-response-completed`, `process-exit`
-- **full**: All events including `session-error`, `session-timeout`, `cancel-initiated`
+- `session-started`, `assistant-response-completed`, `process-exit`
+- `session-error`, `session-timeout`, `cancel-initiated`
+- `user-message-received`
 
 **What is "message"?**
 
-- **message**: Raw JSONL data (content, usage, tools, etc.)
-- **metadata**: Always included (sessionId, timestamp, type, source, responseTime, etc.)
+- **message**: Raw JSONL data (content, usage, tools, etc.) — always included
 
 ### Example Configurations
 
@@ -113,9 +104,7 @@ Choose the appropriate level based on your use case:
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ]
 }
@@ -130,21 +119,15 @@ Choose the appropriate level based on your use case:
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     },
     {
       "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-      "label": "slack-notify",
-      "level": "basic",
-      "includeMessage": false
+      "label": "slack-notify"
     },
     {
       "url": "http://localhost:3200/debug",
       "label": "debug-logger",
-      "level": "full",
-      "includeMessage": true,
       "authorization": "Bearer YOUR_TOKEN"
     }
   ]
@@ -161,9 +144,7 @@ Choose the appropriate level based on your use case:
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ],
   "send": {
@@ -188,9 +169,7 @@ Useful when webhook receivers need to send messages back to claude-code-pipe via
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ],
   "send": {
@@ -1246,38 +1225,16 @@ All events include these metadata fields:
 | `cwdPath` | string | Full path of the server's working directory (claude-code-pipe) |
 | `cwdName` | string | Base name of the server's working directory |
 | `callbackUrl` | string | Callback URL for this server (null if not set in config.json) |
+| `os` | string | Server OS: `"mac"`, `"linux"`, or `"windows"` (WSL is `"linux"`) |
 | `projectPath` | string | Full path of the session's project directory (optional, extracted from JSONL path) |
 | `projectName` | string | Base name of the session's project directory (optional, extracted from JSONL path) |
 | `projectTitle` | string | User-defined project title (optional, only if set in config.json) |
 | `source` | string | Event source: `watcher`, `api`, or `cli` |
+| `isSubagent` | boolean | `true` if this event originated from a subagent JSONL (`/subagents/` path) |
+| `isMeta` | boolean | `true` if this is a meta-message injected by Claude Code harness (e.g., "Continue from where you left off.") |
+| `message` | object | Full JSONL message object (always included) |
 
-Additional fields depend on `includeMessage` setting.
-
-### Basic Event (includeMessage: false)
-
-```json
-{
-  "type": "assistant-response-completed",
-  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
-  "timestamp": "2026-03-01T12:00:05.000Z",
-  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
-  "cwdName": "claude-code-pipe",
-  "callbackUrl": "http://claude-code-pipe:3100",
-  "projectPath": "/home/user/projects/my-app",
-  "projectName": "my-app",
-  "projectTitle": "My Application",
-  "source": "cli",
-  "tools": [],
-  "responseTime": 5234
-}
-```
-
-**Note**:
-- `projectPath` and `projectName` are extracted from JSONL file path and only available for `assistant-response-completed` events
-- `projectTitle` is only included if set in `config.json`
-- `callbackUrl` is `null` if not set in `config.json`
-
-### Full Event (includeMessage: true)
+### Event Payload Example
 
 ```json
 {
@@ -1287,34 +1244,44 @@ Additional fields depend on `includeMessage` setting.
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
   "source": "cli",
   "tools": [],
-  "responseTime": 5234,
+  "responseTime": 5.23,
+  "isSubagent": false,
+  "isMeta": false,
   "message": {
     "role": "assistant",
     "content": "Hello! How can I help you?",
     "usage": {
       "input_tokens": 100,
       "output_tokens": 50
-    },
-    "tools": ["Read", "Write"]
+    }
   }
 }
 ```
 
+**Notes**:
+- `projectPath` and `projectName` are extracted from JSONL file path and only available for `user-message-received` and `assistant-response-completed` events
+- `projectTitle` is only included if set in `config.json`
+- `callbackUrl` is `null` if not set in `config.json`
+- `isSubagent: true` means the event came from a Claude Code subagent session (e.g., Agent tool spawned by the main session)
+- `isMeta: true` means the message was auto-injected by Claude Code harness, not from the user
+
 ### Event Types
 
-| Type | Description | Level | Source |
-|------|-------------|-------|--------|
-| `session-started` | New session created | basic, full | sender |
-| `assistant-response-completed` | Assistant response finished | basic, full | watcher |
-| `process-exit` | Claude process exited | basic, full | sender |
-| `session-error` | Error occurred | full only | watcher |
-| `session-timeout` | Session timed out | full only | watcher |
-| `cancel-initiated` | Cancel requested | full only | canceller |
+| Type | Description | Source |
+|------|-------------|--------|
+| `session-started` | New session created or resumed | sender |
+| `user-message-received` | User message detected in JSONL | watcher |
+| `assistant-response-completed` | Assistant response finished | watcher |
+| `process-exit` | Claude process exited | sender |
+| `session-error` | Error occurred | sender |
+| `session-timeout` | Session timed out | sender |
+| `cancel-initiated` | Cancel requested | canceller |
 
 ### Event Examples
 
@@ -1328,6 +1295,7 @@ Additional fields depend on `includeMessage` setting.
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "model": "claude-sonnet-4-6",
@@ -1345,12 +1313,15 @@ Additional fields depend on `includeMessage` setting.
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
   "source": "cli",
   "tools": [],
-  "responseTime": 5234,
+  "responseTime": 5.23,
+  "isSubagent": false,
+  "isMeta": false,
   "message": {
     "role": "assistant",
     "content": "Hello! How can I help you?",
@@ -1372,6 +1343,7 @@ Additional fields depend on `includeMessage` setting.
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -1389,6 +1361,7 @@ Additional fields depend on `includeMessage` setting.
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"
@@ -1442,7 +1415,6 @@ curl -X POST http://localhost:1880/webhook \
 **Solution 3:** Verify webhook configuration in `config.json`:
 
 - `url` is correct
-- `level` is set to `basic` or `full`
 - `label` is unique
 
 ---
@@ -1640,8 +1612,7 @@ claude-code-pipe/
 #### src/subscribers.js
 
 - Distributes events to webhooks
-- Filters events by level
-- Includes/excludes message content
+- Tags subagent events (`isSubagent`) and meta-messages (`isMeta`)
 
 ### Running Tests
 
@@ -1677,9 +1648,7 @@ Access Node-RED at `http://localhost:1880`.
      "subscribers": [
        {
          "url": "http://localhost:1880/webhook",
-         "label": "test",
-         "level": "full",
-         "includeMessage": true
+         "label": "test"
        }
      ]
    }

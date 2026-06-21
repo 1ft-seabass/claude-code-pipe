@@ -27,8 +27,6 @@ claude-code-pipe の完全なドキュメント
     {
       "url": "http://localhost:1880/webhook",
       "label": "my-service",
-      "level": "basic",
-      "includeMessage": true,
       "authorization": ""
     }
   ],
@@ -60,9 +58,9 @@ claude-code-pipe の完全なドキュメント
 |-------|------|----------|---------|-------------|
 | `url` | string | Yes | - | Webhook エンドポイント URL |
 | `label` | string | Yes | - | ログでの識別用ラベル |
-| `level` | string | Yes | - | イベントレベル: `basic` または `full` |
-| `includeMessage` | boolean | Yes | - | Webhook ペイロードに完全なメッセージ内容を含めるか |
 | `authorization` | string | No | `""` | Authorization ヘッダーの値（例: `Bearer YOUR_TOKEN`） |
+
+> **注意:** `level` と `includeMessage` フィールドは廃止済みで無視されます。全イベントと完全なメッセージ内容が常に配信されます。受信側で `type` や `isSubagent`・`isMeta` フィールドを使ってフィルタしてください。
 
 #### Send 設定
 
@@ -72,26 +70,19 @@ claude-code-pipe の完全なドキュメント
 | `cancelTimeoutMs` | number | No | `3000` | キャンセル操作のタイムアウト（ミリ秒） |
 | `defaultDangerouslySkipPermissions` | boolean | No | `false` | **⚠️ 危険:** 権限確認をスキップするデフォルト値。`true` にすると、全ての Send API リクエストで権限確認がスキップされます（明示的に上書きしない限り）。十分注意して使用してください。詳細は [セキュリティに関する注意事項](#セキュリティに関する注意事項) を参照してください。 |
 
-### Webhook レベル
+### Webhook 配信
 
-用途に応じて適切なレベルを選択してください。
+全イベントと完全なメッセージ内容が購読者全員に常に配信されます。受信側で `type`・`isSubagent`・`isMeta` を使って必要に応じてフィルタしてください。
 
-| level | includeMessage | 説明 | 用途 |
-|-------|---------------|-------------|----------|
-| `basic` | `false` | 最低限のイベント、メタ情報のみ | 軽量な通知（例: Slack） |
-| `basic` | `true` | 最低限のイベント + message 全文 | 標準的な利用（例: Node-RED） |
-| `full` | `false` | 全イベント、メタ情報のみ | デバッグ・監視（メタ情報のみ） |
-| `full` | `true` | 全イベント + message 全文 | 完全なログ記録 |
+**イベントタイプ一覧:**
 
-**レベル別イベントタイプ:**
-
-- **basic**: `session-started`, `assistant-response-completed`, `process-exit`
-- **full**: 上記に加えて `session-error`, `session-timeout`, `cancel-initiated`
+- `session-started`, `assistant-response-completed`, `process-exit`
+- `session-error`, `session-timeout`, `cancel-initiated`
+- `user-message-received`
 
 **「message」とは？**
 
-- **message**: JSONL 生データ（content, usage, tools など）
-- **メタ情報**: 常に含まれる情報（sessionId, timestamp, type, source, responseTime など）
+- **message**: JSONL 生データ（content, usage, tools など）— 常に含まれる
 
 ### 設定例
 
@@ -113,9 +104,7 @@ claude-code-pipe の完全なドキュメント
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ]
 }
@@ -130,21 +119,15 @@ claude-code-pipe の完全なドキュメント
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     },
     {
       "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-      "label": "slack-notify",
-      "level": "basic",
-      "includeMessage": false
+      "label": "slack-notify"
     },
     {
       "url": "http://localhost:3200/debug",
       "label": "debug-logger",
-      "level": "full",
-      "includeMessage": true,
       "authorization": "Bearer YOUR_TOKEN"
     }
   ]
@@ -161,9 +144,7 @@ claude-code-pipe の完全なドキュメント
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ],
   "send": {
@@ -188,9 +169,7 @@ Webhook を受信する側が claude-code-pipe に送信 API でメッセージ�
   "subscribers": [
     {
       "url": "http://localhost:1880/webhook",
-      "label": "node-red",
-      "level": "basic",
-      "includeMessage": true
+      "label": "node-red"
     }
   ],
   "send": {
@@ -791,7 +770,7 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/cancel
 1. プロセスに Ctrl+C シグナルを送信
 2. `cancelTimeoutMs`（デフォルト: 3000ms）待機
 3. プロセスが終了しない場合、強制終了
-4. `cancel-initiated` イベントを送信（level: `full`）
+4. `cancel-initiated` イベントを送信
 
 ### Management
 
@@ -1246,38 +1225,16 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 | `cwdPath` | string | サーバー（claude-code-pipe）の作業ディレクトリのフルパス |
 | `cwdName` | string | サーバーの作業ディレクトリ名（ディレクトリのベース名） |
 | `callbackUrl` | string | このサーバーのコールバック URL（config.json で未設定の場合は null） |
+| `os` | string | サーバーの OS 種別: `"mac"`, `"linux"`, `"windows"`（WSL は `"linux"`） |
 | `projectPath` | string | セッションのプロジェクトディレクトリのフルパス（オプション、JSONL パスから抽出） |
 | `projectName` | string | セッションのプロジェクトディレクトリ名（オプション、JSONL パスから抽出） |
 | `projectTitle` | string | ユーザー定義のプロジェクトタイトル（config.json で設定した場合のみ、オプション） |
 | `source` | string | イベントソース: `watcher`, `api`, または `cli` |
+| `isSubagent` | boolean | サブエージェント JSONL（`/subagents/` パス）由来のイベントの場合 `true` |
+| `isMeta` | boolean | Claude Code ハーネスが自動注入したメタメッセージ（例: "Continue from where you left off."）の場合 `true` |
+| `message` | object | JSONL メッセージオブジェクト（常に含まれる） |
 
-追加のフィールドは `includeMessage` 設定に依存します。
-
-### 基本イベント（includeMessage: false）
-
-```json
-{
-  "type": "assistant-response-completed",
-  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
-  "timestamp": "2026-03-01T12:00:05.000Z",
-  "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
-  "cwdName": "claude-code-pipe",
-  "callbackUrl": "http://claude-code-pipe:3100",
-  "projectPath": "/home/user/projects/my-app",
-  "projectName": "my-app",
-  "projectTitle": "My Application",
-  "source": "cli",
-  "tools": [],
-  "responseTime": 5234
-}
-```
-
-**注**:
-- `projectPath` と `projectName` は JSONL ファイルパスから抽出され、`assistant-response-completed` イベントでのみ利用可能です
-- `projectTitle` は `config.json` で設定した場合のみ含まれます
-- `callbackUrl` は `config.json` で未設定の場合は `null` になります
-
-### 完全イベント（includeMessage: true）
+### イベントペイロード例
 
 ```json
 {
@@ -1287,34 +1244,44 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
   "source": "cli",
   "tools": [],
-  "responseTime": 5234,
+  "responseTime": 5.23,
+  "isSubagent": false,
+  "isMeta": false,
   "message": {
     "role": "assistant",
     "content": "Hello! How can I help you?",
     "usage": {
       "input_tokens": 100,
       "output_tokens": 50
-    },
-    "tools": ["Read", "Write"]
+    }
   }
 }
 ```
 
+**注**:
+- `projectPath` と `projectName` は JSONL ファイルパスから抽出され、`user-message-received` / `assistant-response-completed` イベントで利用可能です
+- `projectTitle` は `config.json` で設定した場合のみ含まれます
+- `callbackUrl` は `config.json` で未設定の場合は `null` になります
+- `isSubagent: true` はメインセッションが Agent ツールで起動したサブエージェント由来のイベントを示します
+- `isMeta: true` はユーザーではなく Claude Code ハーネスが自動注入したメッセージを示します
+
 ### イベントタイプ
 
-| タイプ | 説明 | レベル | ソース |
-|------|-------------|-------|--------|
-| `session-started` | 新しいセッションが作成された | basic, full | sender |
-| `assistant-response-completed` | アシスタントの応答が完了した | basic, full | watcher |
-| `process-exit` | Claude プロセスが終了した | basic, full | sender |
-| `session-error` | エラーが発生した | full のみ | watcher |
-| `session-timeout` | セッションがタイムアウトした | full のみ | watcher |
-| `cancel-initiated` | キャンセルがリクエストされた | full のみ | canceller |
+| タイプ | 説明 | ソース |
+|------|-------------|--------|
+| `session-started` | 新しいセッションが作成または再開された | sender |
+| `user-message-received` | JSONL にユーザーメッセージが検出された | watcher |
+| `assistant-response-completed` | アシスタントの応答が完了した | watcher |
+| `process-exit` | Claude プロセスが終了した | sender |
+| `session-error` | エラーが発生した | sender |
+| `session-timeout` | セッションがタイムアウトした | sender |
+| `cancel-initiated` | キャンセルがリクエストされた | canceller |
 
 ### イベント例
 
@@ -1328,6 +1295,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "model": "claude-sonnet-4-6",
@@ -1345,12 +1313,15 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
   "source": "cli",
   "tools": [],
-  "responseTime": 5234,
+  "responseTime": 5.23,
+  "isSubagent": false,
+  "isMeta": false,
   "message": {
     "role": "assistant",
     "content": "Hello! How can I help you?",
@@ -1372,6 +1343,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -1389,6 +1361,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdPath": "/home/user/workspace/repos/claude-code-pipe",
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
+  "os": "linux",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"
@@ -1442,7 +1415,6 @@ curl -X POST http://localhost:1880/webhook \
 **解決策 3:** `config.json` の Webhook 設定を確認:
 
 - `url` が正しい
-- `level` が `basic` または `full` に設定されている
 - `label` が一意である
 
 ---
@@ -1640,8 +1612,7 @@ claude-code-pipe/
 #### src/subscribers.js
 
 - イベントを Webhook に配信
-- レベルでイベントをフィルタ
-- メッセージ内容の含有/除外
+- サブエージェントイベント（`isSubagent`）とメタメッセージ（`isMeta`）をタグ付け
 
 ### テストの実行
 
@@ -1677,9 +1648,7 @@ npm start
      "subscribers": [
        {
          "url": "http://localhost:1880/webhook",
-         "label": "test",
-         "level": "full",
-         "includeMessage": true
+         "label": "test"
        }
      ]
    }
@@ -1721,7 +1690,7 @@ npm start
    });
    ```
 
-2. 必要に応じて `src/subscribers.js` の Webhook レベルフィルターに追加。
+2. 必要に応じて `src/subscribers.js` の Webhook 配信ロジックに追加。
 
 3. `DETAILS-ja.md` にドキュメント化。
 
