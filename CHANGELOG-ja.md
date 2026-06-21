@@ -5,6 +5,26 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.3] - 2026-06-21
+
+### 追加
+- **Webhook ペイロード強化**: すべてのサブスクライバーペイロードに以下を追加:
+  - `os`: サーバー OS 種別（`"mac"` / `"linux"` / `"windows"`; WSL は `"linux"` として返す）
+  - `isSubagent`: `/subagents/` パス由来のイベントなら `true`
+  - `isMeta`: Claude Code ハーネスが自動注入したメッセージ（system-reminder 等）なら `true`
+  - `communicationMode`: 現在のモード（`"bidirectional"` / `"webhook-only"` / `"watch-only"`）— viewer が `GET /info` をポーリングしなくても常に pipe の状態を把握できる
+  - `mqttCommandTopic`: MQTT が設定されている場合のコマンドトピック名（broker 認証情報は含まない）
+- **`GET /info` エンドポイント新設**: pipe の現在の設定状態を返す — `version`, `os`, `communicationMode`, `callbackUrl`, `subscriberCount`, `projectTitle`, `watchDir`
+
+### 変更
+- **常時全配信**: `level` / `includeMessage` によるフィルタリングを廃止。すべてのイベント・全メッセージ内容を常時配信するようになりました
+  - 既存の config に `level` / `includeMessage` が残っていても動作します（フィールドは無視される）
+  - フィルタリングは viewer 側の責務へ移行。`isMeta` ノイズの非表示や subagent 起動の観測など、リッチなクライアントロジックが可能に
+- **内部リネーム**: `postToSubscriber` → `deliverToSubscriber`（動作変更なし; 将来の MQTT ディスパッチ追加に向けた準備）
+
+### 削除
+- `level` / `includeMessage` サブスクライバー設定オプション（廃止; 設定に残っていても無視）
+
 ## [0.8.2] - 2026-06-04
 
 ### 修正
