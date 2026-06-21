@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-06-21
+
+### Added
+- **Webhook payload enrichment**: All subscriber payloads now include:
+  - `os`: Server OS type (`"mac"` / `"linux"` / `"windows"`; WSL is reported as `"linux"`)
+  - `isSubagent`: `true` if the event originated from a `/subagents/` path
+  - `isMeta`: `true` if the message was auto-injected by the Claude Code harness (system-reminder etc.)
+  - `communicationMode`: Current mode (`"bidirectional"` / `"webhook-only"` / `"watch-only"`) — lets viewers know the pipe's capability without polling `GET /info`
+  - `mqttCommandTopic`: MQTT command topic name when configured (broker credentials are never included)
+- **`GET /info` endpoint**: Returns current pipe configuration state — `version`, `os`, `communicationMode`, `callbackUrl`, `subscriberCount`, `projectTitle`, `watchDir`
+
+### Changed
+- **Always-on delivery**: `level` and `includeMessage` filtering are removed. All events and full message content are always delivered to subscribers
+  - Existing configs that still contain `level` or `includeMessage` continue to work (fields are silently ignored)
+  - Filtering is now the viewer's responsibility, enabling richer client-side logic (e.g. hide `isMeta` noise, observe subagent launches)
+- **Internal rename**: `postToSubscriber` → `deliverToSubscriber` (no behavior change; prepares for future MQTT dispatch)
+
+### Removed
+- `level` / `includeMessage` subscriber config options (deprecated; silently ignored if present)
+
 ## [0.8.2] - 2026-06-04
 
 ### Fixed

@@ -24,6 +24,7 @@ function parseLine(jsonString) {
       sessionId: data.sessionId || null,
       uuid: data.uuid || null,
       timestamp: data.timestamp || null,
+      isMeta: data.isMeta || false,
       message: {},
       tools: []  // 使用ツール一覧
     };

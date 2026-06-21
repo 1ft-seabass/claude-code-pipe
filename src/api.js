@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
-const { startNewSession, sendToSession, getManagedProcesses, killProcess, killAllProcesses } = require('./sender');
+const { startNewSession, sendToSession, getManagedProcesses, killProcess, killAllProcesses, getOsInfo } = require('./sender');
 const { getGitStatus, getGitLog } = require('./git-info');
 
 // package.json を読み込み
@@ -181,6 +181,33 @@ function createApiRouter(watchDir, config) {
       name: packageJson.name,
       version: packageJson.version,
       description: packageJson.description
+    });
+  });
+
+  // GET /info - pipe の現在の設定状態
+  router.get('/info', (req, res) => {
+    const hasCallbackUrl = !!(config.callbackUrl && config.callbackUrl.trim());
+    const mqttCommandTopic = config.mqtt?.commandTopic || null;
+    const subscriberCount = (config.subscribers || []).length;
+
+    let communicationMode;
+    if (subscriberCount === 0) {
+      communicationMode = 'watch-only';
+    } else if (hasCallbackUrl || mqttCommandTopic) {
+      communicationMode = 'bidirectional';
+    } else {
+      communicationMode = 'webhook-only';
+    }
+
+    res.json({
+      version: packageJson.version,
+      os: getOsInfo(),
+      communicationMode,
+      callbackUrl: config.callbackUrl || null,
+      mqttCommandTopic,
+      subscriberCount,
+      projectTitle: config.projectTitle || null,
+      watchDir: config.watchDir
     });
   });
 
