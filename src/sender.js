@@ -38,6 +38,17 @@ function isWindowsNonWSL() {
 }
 
 /**
+ * サーバーの OS 種別を返す
+ * WSL は Node.js から "linux" に見えるため linux 扱い
+ * @returns {"mac" | "linux" | "windows"}
+ */
+function getOsInfo() {
+  if (process.platform === 'darwin') return 'mac';
+  if (process.platform === 'win32') return 'windows';
+  return 'linux';
+}
+
+/**
  * 新しいセッションを開始
  * @param {string} prompt - プロンプトテキスト
  * @param {object} options - オプション
@@ -535,5 +546,6 @@ module.exports = {
   killProcess,
   killAllProcesses,
   processEvents,
-  managedProcesses  // セッション判定用に公開
+  managedProcesses,  // セッション判定用に公開
+  getOsInfo
 };

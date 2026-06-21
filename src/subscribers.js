@@ -9,7 +9,7 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 const path = require('path');
-const { managedProcesses } = require('./sender');
+const { managedProcesses, getOsInfo } = require('./sender');
 const { getGitInfo } = require('./git-info');
 const packageJson = require('../package.json');
 
@@ -157,8 +157,21 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
   const cwdName = path.basename(cwdPath);
   const projectTitle = config.projectTitle || null;
   const callbackUrl = config.callbackUrl || null;
+  const mqttCommandTopic = config.mqtt?.commandTopic || null;
 
-  const serverInfo = { cwdPath, cwdName, projectTitle, callbackUrl };
+  // communicationMode を算出（起動時に一度だけ）
+  const hasCallbackUrl = !!(callbackUrl && callbackUrl.trim());
+  const subscriberCount = (subscribers || []).length;
+  let communicationMode;
+  if (subscriberCount === 0) {
+    communicationMode = 'watch-only';
+  } else if (hasCallbackUrl || mqttCommandTopic) {
+    communicationMode = 'bidirectional';
+  } else {
+    communicationMode = 'webhook-only';
+  }
+
+  const serverInfo = { cwdPath, cwdName, projectTitle, callbackUrl, os: getOsInfo(), communicationMode, mqttCommandTopic };
 
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
@@ -210,45 +223,44 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
  * プロセスイベントを処理（キャンセル、終了など）
  */
 function handleProcessEvent(subscriber, eventType, event, serverInfo) {
-  const { url, label, level, authorization } = subscriber;
+  const { url, label, authorization } = subscriber;
 
-  // basic: 最低限のイベントのみ (session-started, process-exit)
-  // full: 全イベント (session-started, session-error, session-timeout, cancel-initiated, process-exit)
-  const basicEvents = ['session-started', 'process-exit'];
-  const shouldSend = level === 'full' || (level === 'basic' && basicEvents.includes(eventType));
+  // projectPath から projectName を計算
+  const projectPath = event.projectPath || null;
+  const projectName = projectPath ? path.basename(projectPath) : null;
 
-  if (shouldSend) {
-    // projectPath から projectName を計算
-    const projectPath = event.projectPath || null;
-    const projectName = projectPath ? path.basename(projectPath) : null;
-
-    const payload = {
-      type: eventType,
-      version: packageJson.version,
-      sessionId: event.sessionId,
-      pid: event.pid,
-      timestamp: event.timestamp,
-      cwdPath: serverInfo.cwdPath,
-      cwdName: serverInfo.cwdName,
-      callbackUrl: serverInfo.callbackUrl,
-      ...(projectPath && { projectPath }),
-      ...(projectName && { projectName }),
-      ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
-      ...(event.code !== undefined && { code: event.code }),
-      ...(event.signal !== undefined && { signal: event.signal }),
-      ...(event.error !== undefined && { error: event.error }),
-      ...(event.resumed !== undefined && { resumed: event.resumed }),
-      ...(event.model !== undefined && { model: event.model })
-    };
-    postToSubscriber(url, payload, authorization, label);
-  }
+  const payload = {
+    type: eventType,
+    version: packageJson.version,
+    sessionId: event.sessionId,
+    pid: event.pid,
+    timestamp: event.timestamp,
+    cwdPath: serverInfo.cwdPath,
+    cwdName: serverInfo.cwdName,
+    callbackUrl: serverInfo.callbackUrl,
+    os: serverInfo.os,
+    communicationMode: serverInfo.communicationMode,
+    ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
+    ...(projectPath && { projectPath }),
+    ...(projectName && { projectName }),
+    ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
+    ...(event.code !== undefined && { code: event.code }),
+    ...(event.signal !== undefined && { signal: event.signal }),
+    ...(event.error !== undefined && { error: event.error }),
+    ...(event.resumed !== undefined && { resumed: event.resumed }),
+    ...(event.model !== undefined && { model: event.model })
+  };
+  deliverToSubscriber(url, payload, authorization, label);
 }
 
 /**
  * subscriber ごとにイベントを処理
  */
 function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo) {
-  const { url, label, level, includeMessage, authorization } = subscriber;
+  const { url, label, authorization } = subscriber;
+
+  // subagents/ 配下の JSONL かどうかを判定
+  const isSubagent = !!(event.jsonlFilePath && event.jsonlFilePath.includes('/subagents/'));
 
   // user メッセージの場合
   if (event.message && event.message.role === 'user') {
@@ -265,7 +277,6 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
     // タイムスタンプを記録（応答時間計算の起点）
     sessionTimestamps.set(event.sessionId, event.timestamp);
 
-    // 基本ペイロード
     const payload = {
       type: 'user-message-received',
       version: packageJson.version,
@@ -274,19 +285,20 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       cwdPath: serverInfo.cwdPath,
       cwdName: serverInfo.cwdName,
       callbackUrl: serverInfo.callbackUrl,
+      os: serverInfo.os,
+      communicationMode: serverInfo.communicationMode,
+      ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
       ...(projectPath && { projectPath }),
       ...(projectName && { projectName }),
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       source: source,
-      git: gitInfo
+      isSubagent: isSubagent,
+      isMeta: event.isMeta || false,
+      git: gitInfo,
+      message: event.message
     };
 
-    // includeMessage が true の場合、message を追加
-    if (includeMessage) {
-      payload.message = event.message;
-    }
-
-    postToSubscriber(url, payload, authorization, label);
+    deliverToSubscriber(url, payload, authorization, label);
     return;
   }
 
@@ -311,7 +323,6 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
     // Git 情報を取得（キャッシュ付き）
     const gitInfo = getProjectGitInfo(projectPath);
 
-    // 基本ペイロード（メタ情報）
     const payload = {
       type: 'assistant-response-completed',
       version: packageJson.version,
@@ -320,21 +331,22 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       cwdPath: serverInfo.cwdPath,
       cwdName: serverInfo.cwdName,
       callbackUrl: serverInfo.callbackUrl,
+      os: serverInfo.os,
+      communicationMode: serverInfo.communicationMode,
+      ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
       ...(projectPath && { projectPath }),
       ...(projectName && { projectName }),
       ...(serverInfo.projectTitle && { projectTitle: serverInfo.projectTitle }),
       source: source,
       tools: event.tools || [],
       responseTime: responseTime,
-      git: gitInfo
+      isSubagent: isSubagent,
+      isMeta: event.isMeta || false,
+      git: gitInfo,
+      message: event.message
     };
 
-    // includeMessage が true の場合、message を追加
-    if (includeMessage) {
-      payload.message = event.message;
-    }
-
-    postToSubscriber(url, payload, authorization, label);
+    deliverToSubscriber(url, payload, authorization, label);
   }
 }
 
@@ -342,7 +354,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
 /**
  * HTTP POST でデータを送信
  */
-function postToSubscriber(urlString, payload, authorization, label) {
+function deliverToSubscriber(urlString, payload, authorization, label) {
   try {
     const parsedUrl = new URL(urlString);
     const client = parsedUrl.protocol === 'https:' ? https : http;
