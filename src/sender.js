@@ -541,5 +541,6 @@ module.exports = {
   killAllProcesses,
   processEvents,
   managedProcesses,  // セッション判定用に公開
-  getOsInfo
+  getOsInfo,
+  isWindowsNonWSL
 };
