@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-07-08
+
+### Added
+- **Windows native Send Mode support**: `POST /sessions/new` and `POST /sessions/:id/send` now work on Windows (native), not just WSL — previously returned `501 Not Implemented`. Process spawning is abstracted via `spawnClaudeProcess()`, which branches only on how the `claude` process is launched (array-argument `spawn()` on Windows, the existing `script`/PTY wrapper unchanged on Unix)
+
+### Fixed
+- **`extractProjectPath()` didn't recognize Windows-style encoded paths**: directory names starting with a drive letter (e.g. `C--Users-...`) were treated as unrecognized and returned `null`, causing `projectPath` to be silently missing from webhook payloads and absent from `GET /projects` / `GET /sessions` on Windows
+- **Pre-commit secretlint bypass removed**: `simple-git-hooks` no longer swallows `secretlint`/`gitleaks` failures with `|| true` — failures now actually block the commit
+- **Pre-commit secretlint false positives on gitignored files**: scan scope narrowed from all files to staged files only, so files like `logs/server.log` no longer trigger warnings on unrelated commits
+- **Raw session content no longer logged**: `watcher`'s `message` event (which can include full executed command text) is no longer written to `server.log`
+
+### Security
+- Documented that `subscribers[].url` should only point to endpoints inside your trusted network, since webhook payloads include raw session content (including command text) with no filtering or masking
+
 ## [0.8.3] - 2026-06-21
 
 ### Added
