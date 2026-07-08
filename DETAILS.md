@@ -1817,6 +1817,12 @@ For most use cases, use `allowedTools` to restrict tool usage instead:
 
 This allows Claude Code to read files without granting write/execute permissions.
 
+### ⚠️ Webhook (`subscribers`) Data Exposure
+
+Each `subscribers` entry receives the raw session message content (`event.message`), which can include the full text of executed commands (e.g. `Bash` tool calls). This is the same content Claude Code already stores in its own session JSONL files — claude-code-pipe does not add filtering or masking before forwarding it.
+
+**Only point `subscribers[].url` at endpoints inside your trusted network** (e.g. same Tailscale tailnet, same Docker network). Pointing a subscriber at a public/external endpoint (a real Slack incoming webhook, a public server, etc.) forwards raw session content — including any secrets that happened to appear in a command — outside your trust boundary.
+
 ---
 
 ## License

@@ -86,10 +86,8 @@ setupWebSocket(server, watcher);
 // subscribers をセットアップ
 setupSubscribers(config.subscribers, watcher, processEvents, config);
 
-// watcher のイベントをログに記録
-watcher.on('message', (event) => {
-  writeLog('watcher-message', event);
-});
+// watcher の message イベントは生のセッション内容（実行コマンド全文など）を含むため、
+// server.log には記録しない（subscribers への配信はこれとは別経路）
 
 // processEvents のイベントをログに記録
 processEvents.on('session-started', (event) => {

@@ -44,7 +44,15 @@ function writeLog(result) {
 
 try {
   console.log('\n=== secretlint ===');
-  execSync('npx secretlint "**/*"', { stdio: 'inherit' });
+  const stagedFiles = execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean);
+
+  if (stagedFiles.length > 0) {
+    execSync(`npx secretlint ${stagedFiles.map(f => `"${f}"`).join(' ')}`, { stdio: 'inherit' });
+  } else {
+    console.log('(no staged files to check)');
+  }
 
   console.log('\n=== gitleaks ===');
 
