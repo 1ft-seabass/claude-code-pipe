@@ -5,6 +5,20 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.4] - 2026-07-08
+
+### 追加
+- **Windows ネイティブの Send Mode 対応**: `POST /sessions/new` / `POST /sessions/:id/send` が WSL だけでなく Windows（ネイティブ）でも動作するようになりました（従来は `501 Not Implemented`）。プロセス起動は `spawnClaudeProcess()` に抽象化され、`claude` プロセスの起動方法のみが分岐します（Windows は配列渡し `spawn()`、Unix は既存の `script`/PTY ラッパーのまま変更なし）
+
+### 修正
+- **`extractProjectPath()` が Windows 形式のエンコード済みパスを認識できない不具合**: ドライブレターで始まるディレクトリ名（例: `C--Users-...`）が未対応と判定され `null` を返してしまい、Windows で `projectPath` が webhook ペイロードから欠落したり `GET /projects` / `GET /sessions` から消えたりする不具合を修正
+- **pre-commit の secretlint 握りつぶしを修正**: `simple-git-hooks` が `|| true` で `secretlint`/`gitleaks` の失敗を握りつぶしていた問題を修正。失敗時に実際にコミットをブロックするようになりました
+- **pre-commit の secretlint が .gitignore 対象ファイルに誤爆する問題を修正**: スキャン対象を全ファイルからステージ済みファイルのみに変更。`logs/server.log` 等が無関係なコミットのたびに警告を出す問題を解消
+- **生のセッション内容を server.log に記録しないよう修正**: `watcher` の `message` イベント（実行コマンド全文を含みうる）を `server.log` に記録しないようにしました
+
+### セキュリティ
+- webhook ペイロードにはフィルタリング・マスキングなしで生のセッション内容（コマンド全文含む）が含まれるため、`subscribers[].url` は信頼できるネットワーク内のエンドポイントのみを指定すべき旨を DETAILS.md に明記
+
 ## [0.8.3] - 2026-06-21
 
 ### 追加

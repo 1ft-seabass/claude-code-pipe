@@ -42,13 +42,9 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 | Feature | Linux | macOS | WSL | Windows (native) |
 |---------|-------|-------|-----|------------------|
 | Webhook / Watch Mode | ✅ | ✅ | ✅ | ✅ |
-| Send Mode | ✅ | ✅ | ✅ | ❌ |
+| Send Mode | ✅ | ✅ | ✅ | ✅ |
 
-### Windows Native Environment
-
-Windows native environment supports webhook-based session monitoring only. For sending messages to Claude Code, please use the Claude Code CLI directly.
-
-WSL (Windows Subsystem for Linux) users can access full functionality.
+All features are supported on all platforms, including Windows native environments.
 
 ## Quick Start
 

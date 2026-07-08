@@ -9,7 +9,7 @@ const http = require('http');
 const https = require('https');
 const { URL } = require('url');
 const path = require('path');
-const { managedProcesses, getOsInfo } = require('./sender');
+const { managedProcesses, getOsInfo, isWindowsNonWSL } = require('./sender');
 const { getGitInfo } = require('./git-info');
 const packageJson = require('../package.json');
 
@@ -28,10 +28,13 @@ const gitInfoCache = new Map();
  * @param {string} jsonlFilePath - JSONL ファイルのフルパス
  * @returns {string|null} - プロジェクトのフルパス、または null
  *
- * 例: ~/.claude/projects/-home-node-workspace-repos-my-app/session-id.jsonl
+ * Unix の例: ~/.claude/projects/-home-node-workspace-repos-my-app/session-id.jsonl
  * → /home/node/workspace/repos/my-app
  *
- * 注: Claude は "/" を "-" に変換してエンコードするため、元のパスに "-" が
+ * Windows の例: ~/.claude/projects/C--Users-tnkse-workspace-my-app/session-id.jsonl
+ * → C:\Users\tnkse\workspace\my-app
+ *
+ * 注: Claude はパス区切り文字を "-" に変換してエンコードするため、元のパスに "-" が
  * 含まれる場合は正確に復元できない。そのため、実際に存在するパスを探す。
  * 一度解決したパスはキャッシュして再利用する。
  */
@@ -41,10 +44,19 @@ function extractProjectPath(jsonlFilePath) {
   try {
     const dir = path.dirname(jsonlFilePath);
     const projectDirName = path.basename(dir);
+    const isWindows = isWindowsNonWSL();
 
-    // ディレクトリ名が "-" で始まる場合、エンコードされたパスと判断
-    if (!projectDirName.startsWith('-')) {
-      return null;
+    // ディレクトリ名がエンコードされたパスかどうかを判定
+    // Unix: "-home-user-project" のように "-" で始まる
+    // Windows: "C--Users-tnkse-project" のようにドライブレター + "--" で始まる
+    if (isWindows) {
+      if (!/^[A-Za-z]--/.test(projectDirName)) {
+        return null;
+      }
+    } else {
+      if (!projectDirName.startsWith('-')) {
+        return null;
+      }
     }
 
     // キャッシュをチェック
@@ -52,7 +64,7 @@ function extractProjectPath(jsonlFilePath) {
       return projectPathCache.get(projectDirName);
     }
 
-    // JSONL ファイルの先頭から cwd フィールドを探す（最も信頼性が高い方法）
+    // JSONL ファイルの先頭から cwd フィールドを探す（最も信頼性が高い方法、OS非依存）
     // ハイフンを含むパスでも正確に復元できる
     try {
       const fd = fs.openSync(jsonlFilePath, 'r');
@@ -78,6 +90,36 @@ function extractProjectPath(jsonlFilePath) {
       }
     } catch (e) {
       // ファイル読み取り失敗は無視して既存ロジックにフォールバック
+    }
+
+    if (isWindows) {
+      // ドライブレター1文字 + "--" (":" と "\" のエンコード) を除去
+      const driveLetter = projectDirName[0];
+      const encoded = projectDirName.substring(3);
+
+      const commonDepths = [3, 4, 5, 2, 6];
+
+      for (const depth of commonDepths) {
+        const parts = encoded.split('-');
+        if (parts.length >= depth) {
+          const candidatePath = `${driveLetter}:\\` + parts.slice(0, depth).join('\\') +
+                               (parts.length > depth ? '-' + parts.slice(depth).join('-') : '');
+
+          try {
+            if (fs.existsSync(candidatePath)) {
+              projectPathCache.set(projectDirName, candidatePath);
+              return candidatePath;
+            }
+          } catch (e) {
+            // 無視
+          }
+        }
+      }
+
+      // 見つからない場合は、残り全ての "-" を "\" に変換したパスを試す
+      const fullPath = `${driveLetter}:\\` + encoded.replace(/-/g, '\\');
+      projectPathCache.set(projectDirName, fullPath);
+      return fullPath;
     }
 
     // 先頭の "-" を削除

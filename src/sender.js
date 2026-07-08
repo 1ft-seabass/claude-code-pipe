@@ -49,6 +49,31 @@ function getOsInfo() {
 }
 
 /**
+ * claude プロセスを起動する（起動方法のみプラットフォームで分岐）
+ * @param {Array<string>} claudeArgs - claude コマンドの引数配列
+ * @param {string} cwd - 作業ディレクトリ
+ * @returns {import('child_process').ChildProcess}
+ */
+function spawnClaudeProcess(claudeArgs, cwd) {
+  if (isWindowsNonWSL()) {
+    // 配列渡し・shell不要のためエスケープ処理は不要
+    // 実機検証: docs/notes/2026-07-07-12-57-43-windows-native-send-mode-investigation.md
+    return spawn('claude', claudeArgs, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+  }
+
+  // script コマンドで PTY を提供してバッファリングを回避
+  // シェル展開を防ぐため全引数をダブルクォートで囲み \ " ` $ をエスケープする
+  const claudeCommand = `claude ${claudeArgs.map(arg =>
+    `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')}"`
+  ).join(' ')}`;
+
+  return spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
+    cwd,
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+}
+
+/**
  * 新しいセッションを開始
  * @param {string} prompt - プロンプトテキスト
  * @param {object} options - オプション
@@ -66,13 +91,6 @@ function getOsInfo() {
 function startNewSession(prompt, options = {}) {
   const { cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   return new Promise((resolve, reject) => {
-    // Windows (non-WSL) チェック
-    if (isWindowsNonWSL()) {
-      const error = new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.');
-      reject(error);
-      return;
-    }
-
     // claude コマンドの引数を構築
     let claudeArgs = ['-p', prompt, '--output-format', 'stream-json', '--verbose'];
 
@@ -92,16 +110,7 @@ function startNewSession(prompt, options = {}) {
       claudeArgs.push('--dangerously-skip-permissions');
     }
 
-    // script コマンドで PTY を提供してバッファリングを回避
-    // シェル展開を防ぐため全引数をダブルクォートで囲み \ " ` $ をエスケープする
-    const claudeCommand = `claude ${claudeArgs.map(arg =>
-      `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')}"`
-    ).join(' ')}`;
-
-    const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
-      cwd: cwd,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const proc = spawnClaudeProcess(claudeArgs, cwd);
 
     const pid = proc.pid;
     const tempSessionId = `temp-${Date.now()}-${pid}`; // 一時的なセッションID
@@ -276,12 +285,6 @@ function startNewSession(prompt, options = {}) {
 function sendToSession(sessionId, prompt, options = {}) {
   const { cwd, allowedTools, disallowedTools, model, dangerouslySkipPermissions, projectPath, onData, onError, onExit } = options;
   return new Promise((resolve, reject) => {
-    // Windows (non-WSL) チェック
-    if (isWindowsNonWSL()) {
-      reject(new Error('Windows (non-WSL) is not supported for sending messages. Please use Claude Code CLI directly or use WSL.'));
-      return;
-    }
-
     // claude コマンドの引数を構築
     let claudeArgs = ['-p', prompt, '--resume', sessionId, '--output-format', 'stream-json', '--verbose'];
 
@@ -301,16 +304,7 @@ function sendToSession(sessionId, prompt, options = {}) {
       claudeArgs.push('--dangerously-skip-permissions');
     }
 
-    // script コマンドで PTY を提供してバッファリングを回避
-    // シェル展開を防ぐため全引数をダブルクォートで囲み \ " ` $ をエスケープする
-    const claudeCommand = `claude ${claudeArgs.map(arg =>
-      `"${arg.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')}"`
-    ).join(' ')}`;
-
-    const proc = spawn('script', ['-q', '-c', claudeCommand, '/dev/null'], {
-      cwd: cwd,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    const proc = spawnClaudeProcess(claudeArgs, cwd);
 
     const pid = proc.pid;
     let firstLineReceived = false;
@@ -547,5 +541,6 @@ module.exports = {
   killAllProcesses,
   processEvents,
   managedProcesses,  // セッション判定用に公開
-  getOsInfo
+  getOsInfo,
+  isWindowsNonWSL
 };

@@ -42,13 +42,9 @@ Claude Code の JSONL セッションファイルを監視し、REST API で操�
 | 機能 | Linux | macOS | WSL | Windows (ネイティブ) |
 |---------|-------|-------|-----|------------------|
 | Webhook / Watch Mode | ✅ | ✅ | ✅ | ✅ |
-| Send Mode | ✅ | ✅ | ✅ | ❌ |
+| Send Mode | ✅ | ✅ | ✅ | ✅ |
 
-### Windows ネイティブ環境について
-
-Windows ネイティブ環境では、Webhook によるセッション監視のみサポートしています。Claude Code へのメッセージ送信には、Claude Code CLI を直接ご利用ください。
-
-WSL（Windows Subsystem for Linux）環境では、すべての機能をご利用いただけます。
+Windows ネイティブ環境を含む、すべてのプラットフォームで全機能をご利用いただけます。
 
 ## クイックスタート
 

@@ -1513,35 +1513,15 @@ npm start
 
 ---
 
-### Platform-specific issues
+### Platform-specific notes
 
-**Symptom:** `POST /sessions/new` or `POST /sessions/:id/send` returns 501 on Windows.
+**Windows native Send Mode**: Since v0.8.4, `POST /sessions/new` and `POST /sessions/:id/send` are fully supported on Windows (native), not just WSL.
 
-**Recommended solutions:**
+Process spawning is abstracted via `spawnClaudeProcess()` in `src/sender.js`, which branches only on how the `claude` process is launched:
+- **Unix (Linux/macOS/WSL)**: `script -q -c "<escaped command>" /dev/null` (a PTY avoids stdout buffering issues)
+- **Windows (native)**: `spawn('claude', claudeArgs, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })` — array-argument spawn with no shell, so no escaping is needed and stdout arrives without buffering
 
-1. **Use Claude Code CLI directly** for sending messages on Windows:
-   ```bash
-   claude -p "your prompt" --output-format stream-json
-   ```
-
-2. **Use WSL** (Windows Subsystem for Linux) for full functionality:
-   - Install WSL2 on Windows
-   - Run `claude-code-pipe` inside WSL
-   - All features work as on Linux
-
-3. **Use Watch Mode only** on Windows native:
-   - Webhook-based session monitoring works on all platforms
-   - Configure webhooks to receive notifications when Claude Code responds
-
-**Technical background:**
-
-Our current implementation uses the `script` command (Linux/Unix) to provide a pseudo-terminal (PTY), which prevents output buffering issues when spawning Claude CLI processes. When we tested on Windows, we explored several alternatives but haven't found a lightweight solution that fits this project's minimal philosophy:
-
-- **PowerShell / direct spawn**: Encountered buffering issues in our testing
-- **Git Bash**: The MinGW environment doesn't include the `script` command
-- **node-pty**: While this would solve the issue, it requires native compilation which increases setup complexity
-
-We've chosen to keep the implementation simple and recommend WSL for Windows users who need the full Send Mode functionality.
+Earlier versions returned `501 Not Implemented` on Windows native, based on 2026-03-08 testing that found direct spawn hung due to buffering. Re-testing in 2026-07 against a current Claude Code CLI build found this no longer reproduces — stdout streams immediately, so the `script`/PTY workaround turned out to be unnecessary on Windows.
 
 ---
 
@@ -1816,6 +1796,12 @@ For most use cases, use `allowedTools` to restrict tool usage instead:
 ```
 
 This allows Claude Code to read files without granting write/execute permissions.
+
+### ⚠️ Webhook (`subscribers`) Data Exposure
+
+Each `subscribers` entry receives the raw session message content (`event.message`), which can include the full text of executed commands (e.g. `Bash` tool calls). This is the same content Claude Code already stores in its own session JSONL files — claude-code-pipe does not add filtering or masking before forwarding it.
+
+**Only point `subscribers[].url` at endpoints inside your trusted network** (e.g. same Tailscale tailnet, same Docker network). Pointing a subscriber at a public/external endpoint (a real Slack incoming webhook, a public server, etc.) forwards raw session content — including any secrets that happened to appear in a command — outside your trust boundary.
 
 ---
 
