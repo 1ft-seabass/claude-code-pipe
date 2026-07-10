@@ -6,7 +6,7 @@ paths = [
   '''node_modules/.*''',
   '''dist/.*''',
   '''.git/.*''',
-  '''tmp/.*''',
+  '''^tmp/.*''',
 ]
 
 # Allowlist for regex patterns (common placeholders)
@@ -18,3 +18,6 @@ regexes = [
   '''xxxxxx''',
   '''PLACEHOLDER''',
 ]
+
+[extend]
+useDefault = true
