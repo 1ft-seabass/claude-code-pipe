@@ -63,6 +63,41 @@ function checkResult(passed, message, type = 'normal') {
 }
 
 // ===========================
+// husky (v1) 先行検知
+// ===========================
+// 「共通」ワンショット指示（README）は version-detect を経由せず直接このスクリプトを
+// 呼ぶため、ここで検知しないと v1(husky) 構成が素通りし、Phase 1 の新規導入フローが
+// 既存の husky 設定の上に simple-git-hooks を重ねてしまうリスクがある。
+// 判定ロジックは version-detect/scripts/detect-version.js と同一。
+(function checkHuskyLegacy() {
+  const pkgRaw = readFile('package.json');
+  let pkg = null;
+  if (pkgRaw) {
+    try {
+      pkg = JSON.parse(pkgRaw);
+    } catch (e) {
+      // parse error
+    }
+  }
+
+  const hasHusky = !!(pkg && ((pkg.devDependencies && pkg.devDependencies['husky']) || (pkg.dependencies && pkg.dependencies['husky'])));
+  const hasLintStaged = !!(pkg && ((pkg.devDependencies && pkg.devDependencies['lint-staged']) || (pkg.dependencies && pkg.dependencies['lint-staged']) || pkg['lint-staged']));
+  const huskyDirExists = fileExists('.husky');
+
+  if (hasHusky || hasLintStaged || huskyDirExists) {
+    const reasons = [];
+    if (hasHusky) reasons.push('husky が devDependencies に存在');
+    if (hasLintStaged) reasons.push('lint-staged が devDependencies/設定に存在');
+    if (huskyDirExists) reasons.push('.husky/ ディレクトリが存在');
+
+    console.log('⚠️  husky/lint-staged ベースの v1 構成を検出しました（' + reasons.join(' / ') + '）');
+    console.log('    このまま Phase 1 以降を進めると、既存の v1 設定の上に v2 が重なり混在状態になる可能性があります。');
+    console.log('    先に migration/MIGRATION_GUIDE_v1_to_v2.0.1.md を参照してください。');
+    console.log('');
+  }
+})();
+
+// ===========================
 // 存在チェック
 // ===========================
 console.log('[存在チェック]');
@@ -146,8 +181,11 @@ if (secretlintrcExists) {
 // 7. gitleaks.toml の内容
 if (gitleaksTomlExists) {
   const gitleaksToml = readFile('gitleaks.toml');
-  const isNotEmpty = gitleaksToml && gitleaksToml.trim().length > 0;
-  checkResult(isNotEmpty, 'gitleaks.toml が' + (isNotEmpty ? '空でない' : '空ファイルです'));
+  // [allowlist] だけで [extend]/[rules] が無いと検出ルール 0 個で動作してしまう。
+  // 「空でないこと」だけの確認では見逃すため、検出ルールの有無を確認する。
+  const hasRules = gitleaksToml && (/\[extend\]/.test(gitleaksToml) || /\[\[rules\]\]/.test(gitleaksToml));
+  checkResult(hasRules, 'gitleaks.toml に検出ルール（[extend] または [[rules]]）' +
+    (hasRules ? ' あり' : ' が見つかりません — [allowlist] のみの場合、検出ルール 0 個で動作します'));
 } else {
   checkResult(false, 'gitleaks.toml — 存在チェックが ❌ のためスキップ', 'skip');
 }
@@ -156,7 +194,12 @@ if (gitleaksTomlExists) {
 if (gitHookExists) {
   const precommit = readFile('.git/hooks/pre-commit');
   const hasPreCommitJs = precommit && precommit.includes('pre-commit.js');
-  checkResult(hasPreCommitJs, '.git/hooks/pre-commit に pre-commit.js' + (hasPreCommitJs ? ' あり' : ' が含まれていません'));
+  const hasSuppression = precommit && /\|\|\s*true/.test(precommit);
+  if (hasSuppression) {
+    checkResult(false, '.git/hooks/pre-commit — || true が含まれており exit code が握りつぶされています（コミットがブロックされません）');
+  } else {
+    checkResult(hasPreCommitJs, '.git/hooks/pre-commit に pre-commit.js' + (hasPreCommitJs ? ' あり' : ' が含まれていません'));
+  }
 } else {
   checkResult(false, '.git/hooks/pre-commit — 存在チェックが ❌ のためスキップ', 'skip');
 }
@@ -193,7 +236,45 @@ if (fs.existsSync(localBinary)) {
   checkResult(false, `gitleaks — bin/${binaryName} が見つかりません（node scripts/install-gitleaks.js で導入してください）`);
 }
 
-// 11. 実行ログの最終確認
+// 11. gitleaks 機能的カナリアテスト
+// 「[extend]/[rules] という文字列が書いてある」だけでは、実際に検出ルールが
+// 機能しているかは分からない（存在確認・内容確認と動作確認は別物）。
+// 合成シークレットを実際にスキャンし、検出できるかで確認する。
+if (gitleaksVersion) {
+  // 相対パスで指定する（絶対パスを渡すと、プロジェクトが "/tmp/..." 配下に
+  // チェックアウトされている場合などに gitleaks.toml の allowlist paths
+  // "tmp/.*" に誤爆し、カナリア自体が除外されてしまう）
+  const canaryDirName = '.security-verify-canary';
+  const canaryDir = path.join(process.cwd(), canaryDirName);
+  const canaryFile = path.join(canaryDir, 'canary.env');
+  // allowlist の regexes（YOUR_TOKEN_HERE, xxxxxx 等）に一致しない合成値
+  const CANARY_SECRET = 'ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'; // gitleaks:allow secretlint-disable-line
+
+  try {
+    fs.mkdirSync(canaryDir, { recursive: true });
+    fs.writeFileSync(canaryFile, `GITHUB_PAT=${CANARY_SECRET}\n`);
+
+    const gitleaksBinaryPath = fs.existsSync(localBinary) ? `"${localBinary}"` : 'gitleaks';
+    const canaryCmd = `${gitleaksBinaryPath} dir "${canaryDirName}" --config gitleaks.toml --redact`;
+
+    try {
+      execSync(canaryCmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      checkResult(false, 'gitleaks 機能的カナリアテスト — 合成シークレットが検出されませんでした（検出ルールが無効化されている可能性）');
+    } catch (e) {
+      if (e.status === 1) {
+        checkResult(true, 'gitleaks 機能的カナリアテスト — 合成シークレットを正しく検出');
+      } else {
+        checkResult(false, `gitleaks 機能的カナリアテスト — 予期しないエラー（exit ${e.status}）`);
+      }
+    }
+  } finally {
+    fs.rmSync(canaryDir, { recursive: true, force: true });
+  }
+} else {
+  checkResult(false, 'gitleaks 機能的カナリアテスト — gitleaks が未導入のためスキップ', 'skip');
+}
+
+// 12. 実行ログの最終確認
 const logFile = path.join(process.cwd(), '.logs', 'pre-commit.log');
 if (fs.existsSync(logFile)) {
   const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
@@ -220,13 +301,44 @@ if (fs.existsSync(logFile)) {
   checkResult(false, '実行ログ — .logs/pre-commit.log が見つかりません（一度もコミットしていない可能性）');
 }
 
+// 13. ネガティブテスト実行痕跡（カナリアblocked）
+// 「実行ログが新しい」だけでは、Step 3.6.5のネガティブテスト（シークレットが
+// 実際にブロックされるかの確認）が一度でも実行されたかは分からない。
+// pre-commit.js は .test-secret-canary がステージされたコミットを type: 'canary'
+// としてログに記録するため、その痕跡の有無で確認する（集計数字ではなく事実で判定する）。
+if (fs.existsSync(logFile)) {
+  const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
+  const canaryEntries = lines
+    .map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    })
+    .filter(entry => entry && entry.type === 'canary');
+
+  const passedCanary = canaryEntries.find(entry => entry.result === 'passed');
+  const blockedCanary = canaryEntries.slice().reverse().find(entry => entry.result === 'failed');
+
+  if (passedCanary) {
+    checkResult(false, `ネガティブテスト実行痕跡 — カナリアがブロックされずコミットされた形跡があります（${passedCanary.timestamp}）。pre-commit フックが機能していない可能性`);
+  } else if (blockedCanary) {
+    checkResult(true, `ネガティブテスト実行痕跡 — ${blockedCanary.timestamp.slice(0, 10)} にカナリアがブロックされたことを確認`);
+  } else {
+    checkResult(false, 'ネガティブテスト実行痕跡 — Step 3.6.5のネガティブテストが実行された形跡がありません', 'warning');
+  }
+} else {
+  checkResult(false, 'ネガティブテスト実行痕跡 — .logs/pre-commit.log が見つかりません', 'skip');
+}
+
 console.log('');
 
 // ===========================
 // 結果サマリー
 // ===========================
 console.log('================================');
-console.log(`結果: ${results.passed}/11 passed, ${results.failed} failed, ${results.warning} warning${results.skipped > 0 ? `, ${results.skipped} skipped` : ''}`);
+console.log(`結果: ${results.passed}/13 passed, ${results.failed} failed, ${results.warning} warning${results.skipped > 0 ? `, ${results.skipped} skipped` : ''}`);
 
 if (results.failed > 0) {
   console.log('\n❌ ヘルスチェックに問題があります。まず設定を修正してください。');
@@ -285,13 +397,17 @@ if (testRun || simpleRun) {
   if (gitleaksVersion) {
     console.log('[gitleaks テスト]');
 
+    // gitleaks 8.28+ では detect/protect が --help から非表示になった非推奨コマンドのため、
+    // 後継の git サブコマンドを使用する（--staged: ステージ済みのみ / 無指定: 全履歴）
+    // --redact: 検出時に実際のシークレット値をログ・標準出力に出さないため（AIとの会話や
+    // ノートへの貼り付けが新たな漏洩経路にならないようにする）
     const gitleaksCmd = fs.existsSync(localBinary)
       ? (simpleRun
-          ? `"${localBinary}" protect --staged -v --config gitleaks.toml`
-          : `"${localBinary}" detect --source . -v --config gitleaks.toml`)
+          ? `"${localBinary}" git --staged -v --config gitleaks.toml --redact .`
+          : `"${localBinary}" git -v --config gitleaks.toml --redact .`)
       : (simpleRun
-          ? 'gitleaks protect --staged -v --config gitleaks.toml'
-          : 'gitleaks detect --source . -v --config gitleaks.toml');
+          ? 'gitleaks git --staged -v --config gitleaks.toml --redact .'
+          : 'gitleaks git -v --config gitleaks.toml --redact .');
 
     console.log(`  ${gitleaksCmd}`);
 

@@ -4,7 +4,6 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const zlib = require('zlib');
 
 // gitleaks version to install
 const GITLEAKS_VERSION = '8.30.0';
@@ -89,11 +88,18 @@ function extractAndCleanup() {
 
   try {
     if (isWindows) {
-      // Use PowerShell Expand-Archive on Windows
-      const psCommand = `Expand-Archive -Path "${downloadPath}" -DestinationPath "${binDir}" -Force`;
-      execSync(`powershell -Command "${psCommand}"`, { stdio: 'inherit' });
+      // Use adm-zip (pure JS) to avoid PowerShell dependency
+      try {
+        require.resolve('adm-zip');
+      } catch (e) {
+        console.log('   adm-zip をインストールしています...');
+        execSync('npm install --no-save adm-zip', { stdio: 'inherit' });
+      }
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(downloadPath);
+      zip.extractAllTo(binDir, true);
     } else {
-      // Use Node.js built-in zlib + tar for Linux/macOS
+      // Use system tar for Linux/macOS (universally available)
       const tar = require('child_process').spawn('tar', ['-xzf', downloadPath, '-C', binDir]);
       tar.on('close', (code) => {
         if (code !== 0) {
