@@ -20,8 +20,8 @@ tags: [bug, session-error, projectPath, cwd, spawn, ENOENT, api, viewer, self-am
 
 再現した壊れ方は、プロジェクトディレクトリ名の `-` が全て `/` に変換された形：
 
-- `server-control` → `/home/seigo/tanaka/workspace/server/control`
-- `docker-test-ai-dev` → `/home/seigo/tanaka/workspace/docker/test/ai/dev`
+- `server-control` → `/home/user/workspace/server/control`
+- `docker-test-ai-dev` → `/home/user/workspace/docker/test/ai/dev`
 
 ## 根本原因
 
