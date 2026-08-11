@@ -715,6 +715,12 @@ function createApiRouter(watchDir, config) {
           message: 'Please specify projectPath (or cwd for backward compatibility) to set the working directory for the session'
         });
       }
+      if (!fs.existsSync(workingDirectory)) {
+        return res.status(400).json({
+          error: 'projectPath does not exist',
+          message: `The specified working directory does not exist: ${workingDirectory}`
+        });
+      }
 
       // dangerouslySkipPermissions のデフォルト値を config から取得
       const skipPermissions = dangerouslySkipPermissions !== undefined
@@ -813,6 +819,12 @@ function createApiRouter(watchDir, config) {
         return res.status(400).json({
           error: 'projectPath is required',
           message: 'Please specify projectPath (or cwd for backward compatibility) to set the working directory for the session'
+        });
+      }
+      if (!fs.existsSync(workingDirectory)) {
+        return res.status(400).json({
+          error: 'projectPath does not exist',
+          message: `The specified working directory does not exist: ${workingDirectory}`
         });
       }
 
