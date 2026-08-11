@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5] - 2026-08-11
+
+### Fixed
+- **`projectPath` existence is now validated before spawning**: `/sessions/new` and `/sessions/:id/send` now check that the requested working directory exists on disk (`fs.existsSync`) and return `400 projectPath does not exist` immediately if it doesn't — instead of reaching `spawn()` and surfacing a confusing `ENOENT`. This also prevents a self-amplifying loop where a broken `projectPath` (e.g. from a legacy `extractProjectPath` encoding bug) caused a `session-error` event that carried the same broken path back to clients, which then stored and re-sent it on every subsequent request
+
 ## [0.8.4] - 2026-07-08
 
 ### Added
