@@ -12,6 +12,7 @@
     "dev:tmux:logs": "tmux capture-pane -t claude-code-pipe -p -S -100 2>/dev/null || echo 'Session not found'",
     "dev:tmux:logs:realtime": "tmux attach -t claude-code-pipe",
     "dev:tmux:stop": "tmux kill-session -t claude-code-pipe 2>/dev/null || echo 'No session to stop'",
+    "security": "node .security-check/cli.js",
     "security:verify": "node scripts/security-verify.js",
     "security:verify:simple": "node scripts/security-verify.js --simple",
     "security:verify:testrun": "node scripts/security-verify.js --test-run",
@@ -36,11 +37,11 @@
     "ws": "^8.14.2"
   },
   "devDependencies": {
-    "@secretlint/secretlint-rule-preset-recommend": "^11.3.1",
-    "secretlint": "^11.3.1",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
+    "secretlint": "^11.7.1",
     "simple-git-hooks": "^2.13.1"
   },
   "simple-git-hooks": {
-    "pre-commit": "if [ -f scripts/pre-commit.js ]; then node scripts/pre-commit.js; fi"
+    "pre-commit": "if [ -f .security-check/cli.js ]; then node .security-check/cli.js pre-commit; fi"
   }
 }
