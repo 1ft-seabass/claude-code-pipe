@@ -1207,6 +1207,91 @@ curl -X POST http://localhost:3100/attachments \
 { "error": "File type not allowed" }
 ```
 
+#### `POST /projects/file`
+
+プロジェクト内の単一テキストファイルの内容を取得します。pipe-viewer のようなビューワーUIが、ファイルパスにリンクを張ってその場で中身を表示できるようにするためのものです（別エディタへのリンクのみに留めず）。
+
+`projectPath`は呼び出し元を信頼するモデル（`/git/status`や`/git/log`と同じ）です。呼び出し元は既にパスを把握している前提で、このAPI自体はファイル一覧を列挙しません。`filePath`は`projectPath`配下に収まるよう検証されます（パストラバーサル・symlink経由の脱出は拒否）。
+
+**リクエスト:**
+
+```bash
+curl -X POST http://localhost:3100/projects/file \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectPath": "/path/to/project",
+    "filePath": "docs/notes/2026-01-01-00-00-00-example.md"
+  }'
+```
+
+**リクエストボディ:**
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `projectPath` | string | Yes | プロジェクトディレクトリの絶対パス |
+| `filePath` | string | Yes | `projectPath` からの相対ファイルパス |
+
+**レスポンス:**
+
+```json
+{
+  "content": "# Example\n\nFile contents here...",
+  "mtime": "2026-01-01T00:00:00.000Z",
+  "size": 1234
+}
+```
+
+**レスポンスフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `content` | string | ファイルの中身（UTF-8テキスト） |
+| `mtime` | string | ISO 8601形式の最終更新日時 |
+| `size` | number | ファイルサイズ（バイト） |
+
+**ブロックされる条件:**
+
+| 条件 | ステータス | 理由 |
+|-----------|--------|--------|
+| `filePath`が`projectPath`の外を指す（symlink経由含む） | `400` | パストラバーサル対策 |
+| パスのいずれかのセグメントが`.`始まり（`.env`, `.git/`, `.ssh/`等） | `400` | 隠しファイル・secrets系はこのAPIでは常に非対応。code-server等を利用 |
+| `.gitignore`対象（ベストエフォート。`projectPath`がgitリポジトリでない場合はスキップ） | `400` | ビルド成果物やローカルsecrets等、追跡対象外のファイルを範囲外に |
+| 拡張子がdenylistに該当 | `400` | 既知のバイナリ形式（画像・アーカイブ・実行ファイル・フォント・メディア等）をブロック |
+| 通常ファイルでない | `400` | ディレクトリや特殊ファイルは拒否 |
+| サイズ上限超過 | `413` | デフォルト1MB |
+
+**サポートされる拡張子:** denylist方式。`config.viewer.deniedExtensions`で設定したバイナリ・危険な拡張子以外は基本的に閲覧可能（デフォルトは画像・アーカイブ・実行ファイル・フォント・メディア等の一般的な形式をカバー）。サイズ上限は`config.viewer.maxFileSize`で設定（デフォルト`1048576`バイト = 1MB）。
+
+**エラーレスポンス:**
+
+```json
+{ "error": "projectPath and filePath are required" }
+```
+
+```json
+{ "error": "projectPath does not exist" }
+```
+
+```json
+{ "error": "filePath must resolve within projectPath" }
+```
+
+```json
+{ "error": "Hidden files/directories are not viewable via this API. Use code-server instead." }
+```
+
+```json
+{ "error": "File is git-ignored and not viewable via this API. Use code-server instead." }
+```
+
+```json
+{ "error": "File not found" }
+```
+
+```json
+{ "error": "File too large. Max size: 1048576 bytes" }
+```
+
 ---
 
 ## Webhook イベントフォーマット

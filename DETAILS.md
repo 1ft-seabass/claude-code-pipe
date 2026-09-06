@@ -1207,6 +1207,91 @@ curl -X POST http://localhost:3100/attachments \
 { "error": "File type not allowed" }
 ```
 
+#### `POST /projects/file`
+
+Get the content of a single text file within a project. Intended for viewer UIs (e.g. pipe-viewer) that link to a file path and want to render it inline instead of only linking out to a separate editor.
+
+`projectPath` is trusted (same model as `/git/status` and `/git/log` — the caller is expected to already know the path, this endpoint does not enumerate or list files). `filePath` is validated to stay within `projectPath` (path traversal and symlink escapes are rejected).
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3100/projects/file \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectPath": "/path/to/project",
+    "filePath": "docs/notes/2026-01-01-00-00-00-example.md"
+  }'
+```
+
+**Request Body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `projectPath` | string | Yes | Absolute path to the project directory |
+| `filePath` | string | Yes | Path to the file, relative to `projectPath` |
+
+**Response:**
+
+```json
+{
+  "content": "# Example\n\nFile contents here...",
+  "mtime": "2026-01-01T00:00:00.000Z",
+  "size": 1234
+}
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `content` | string | File contents (UTF-8 text) |
+| `mtime` | string | ISO 8601 last-modified time |
+| `size` | number | File size in bytes |
+
+**What gets blocked (and why):**
+
+| Condition | Status | Reason |
+|-----------|--------|--------|
+| `filePath` resolves outside `projectPath` (including via symlink) | `400` | Path traversal protection |
+| Any path segment starts with `.` (e.g. `.env`, `.git/`, `.ssh/`) | `400` | Hidden files/secrets are never viewable via this API — use code-server instead |
+| File matches `.gitignore` (best-effort; skipped if `projectPath` isn't a git repo) | `400` | Keeps untracked/ignored files (build output, local secrets) out of scope |
+| Extension is in the denylist | `400` | Blocks known binary formats (images, archives, executables, fonts, media, etc.) |
+| Not a regular file | `400` | Directories and special files are rejected |
+| File exceeds size limit | `413` | Default 1MB |
+
+**Supported Extensions:** denylist-based — everything is viewable except binary/risky extensions configured via `config.viewer.deniedExtensions` (default covers common images, archives, executables, fonts, and media formats). Configure via `config.viewer.maxFileSize` for the size cap (default `1048576` bytes / 1MB).
+
+**Error Responses:**
+
+```json
+{ "error": "projectPath and filePath are required" }
+```
+
+```json
+{ "error": "projectPath does not exist" }
+```
+
+```json
+{ "error": "filePath must resolve within projectPath" }
+```
+
+```json
+{ "error": "Hidden files/directories are not viewable via this API. Use code-server instead." }
+```
+
+```json
+{ "error": "File is git-ignored and not viewable via this API. Use code-server instead." }
+```
+
+```json
+{ "error": "File not found" }
+```
+
+```json
+{ "error": "File too large. Max size: 1048576 bytes" }
+```
+
 ---
 
 ## Webhook Event Format
