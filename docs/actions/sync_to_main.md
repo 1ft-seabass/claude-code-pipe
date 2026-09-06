@@ -100,6 +100,16 @@ sync-to-main.js の `filesToSync` を確認し、実際に main に反映され�
 - v0.6.1: CHANGELOG の追加のみ → `v0.6.1 from develop - CHANGELOG 設置`
 - v0.7.0: 新機能追加 → `v0.7.0 from develop - user メッセージ Webhook・バージョン情報追加`
 
+提案したプレフィックス（通常 `sync`）とメッセージは、develop リポジトリ直下の
+`.commit-main-draft.json` に書き出してください（`.gitignore` 済み・使い切りで自動削除される）：
+
+```json
+{ "prefix": "sync", "message": "v0.8.6 from develop - プロジェクト内テキストファイル閲覧API(/projects/file)追加" }
+```
+
+Step 5 で `commit-main` を実行すると、この内容が入力欄にプリフィルされた状態で表示されます
+（そのまま Enter で採用、書き換えも可能）。
+
 ### Step 5: commit-main の実行をユーザーに案内
 
 **ユーザーが実行します。AI は実行しないでください。**

@@ -15,8 +15,32 @@
  */
 
 const readline = require('readline');
+const fs = require('fs');
+const path = require('path');
 const { execSync } = require('child_process');
 const { detectMainWorktree } = require('../src/git-info');
+
+// AI が事前に提案したコミットメッセージ案（存在すれば入力のデフォルト値に使う）
+const DRAFT_PATH = path.join(__dirname, '..', '.commit-main-draft.json');
+
+function loadDraft() {
+  if (!fs.existsSync(DRAFT_PATH)) {
+    return null;
+  }
+  try {
+    const draft = JSON.parse(fs.readFileSync(DRAFT_PATH, 'utf8'));
+    return {
+      prefix: typeof draft.prefix === 'string' ? draft.prefix : null,
+      message: typeof draft.message === 'string' ? draft.message : null,
+    };
+  } catch (error) {
+    log(`⚠️  Failed to read draft (${DRAFT_PATH}), ignoring: ${error.message}`, 'yellow');
+    return null;
+  } finally {
+    // 使い切り。古いドラフトが次回以降に誤って再利用されるのを防ぐ
+    fs.rmSync(DRAFT_PATH, { force: true });
+  }
+}
 
 // ANSI color codes
 const colors = {
@@ -55,11 +79,16 @@ const rl = readline.createInterface({
 });
 
 // Promise ベースの質問関数
-function question(prompt) {
+// prefill を渡すと、入力欄にあらかじめ文字列を「入力済み」の状態で表示する
+// （TTY 上で rl.write() が入力バッファに文字を挿入する。Enter でそのまま採用、編集も可能）
+function question(prompt, prefill) {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       resolve(answer);
     });
+    if (prefill) {
+      rl.write(prefill);
+    }
   });
 }
 
@@ -104,7 +133,15 @@ function showDiff(mainPath) {
   }
 }
 
-async function selectPrefix() {
+const PREFIX_MAP = {
+  '1': 'feat',
+  '2': 'fix',
+  '3': 'docs',
+  '4': 'chore',
+  '5': 'sync',
+};
+
+async function selectPrefix(draftPrefix) {
   log('\n📝 Select commit prefix:', 'blue');
   log('   [1] feat    - 新機能', 'cyan');
   log('   [2] fix     - バグ修正', 'cyan');
@@ -112,33 +149,36 @@ async function selectPrefix() {
   log('   [4] chore   - その他（ビルド、設定など）', 'cyan');
   log('   [5] sync    - develop からの同期', 'cyan');
 
-  const answer = await question('\nSelect number [1-5]: ');
+  const draftNumber = draftPrefix
+    ? Object.keys(PREFIX_MAP).find(key => PREFIX_MAP[key] === draftPrefix)
+    : null;
 
-  const prefixMap = {
-    '1': 'feat',
-    '2': 'fix',
-    '3': 'docs',
-    '4': 'chore',
-    '5': 'sync',
-  };
+  if (draftNumber) {
+    log(`   （AI提案: [${draftNumber}] ${draftPrefix} — そのままEnter、または番号で変更）`, 'gray');
+  }
 
-  const prefix = prefixMap[answer.trim()];
+  const answer = await question('\nSelect number [1-5]: ', draftNumber);
+
+  const prefix = PREFIX_MAP[answer.trim()];
 
   if (!prefix) {
     log('❌ Invalid selection', 'red');
-    return selectPrefix(); // 再帰的に再入力を促す
+    return selectPrefix(draftPrefix); // 再帰的に再入力を促す
   }
 
   return prefix;
 }
 
-async function inputMessage() {
+async function inputMessage(draftMessage) {
   log('\n✍️  Enter commit message (Japanese):', 'blue');
-  const message = await question('Message: ');
+  if (draftMessage) {
+    log('   （AI提案のメッセージをプリフィルしています。そのままEnter、または書き換えてください）', 'gray');
+  }
+  const message = await question('Message: ', draftMessage);
 
   if (!message.trim()) {
     log('❌ Message cannot be empty', 'red');
-    return inputMessage(); // 再帰的に再入力を促す
+    return inputMessage(draftMessage); // 再帰的に再入力を促す
   }
 
   return message.trim();
@@ -231,9 +271,15 @@ async function main() {
     // ステージング済みの差分を表示
     showDiff(mainPath);
 
+    // AI が事前に用意したドラフト（あれば）を読み込む。読み込み後は使い切りで削除される
+    const draft = loadDraft();
+    if (draft) {
+      log('\n💡 AIが提案したコミット案を読み込みました', 'cyan');
+    }
+
     // コミットメッセージの入力
-    const prefix = await selectPrefix();
-    const message = await inputMessage();
+    const prefix = await selectPrefix(draft?.prefix);
+    const message = await inputMessage(draft?.message);
 
     // プレビュー表示
     previewCommitMessage(prefix, message);
