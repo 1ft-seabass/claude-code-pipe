@@ -26,5 +26,17 @@
   "upload": {
     "maxBodySize": "10mb",
     "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+  },
+  "viewer": {
+    "deniedExtensions": [
+      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico", ".svg",
+      ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+      ".zip", ".tar", ".gz", ".tgz", ".7z", ".rar",
+      ".exe", ".dll", ".so", ".dylib", ".bin", ".app",
+      ".woff", ".woff2", ".ttf", ".otf", ".eot",
+      ".mp3", ".mp4", ".mov", ".avi", ".wav", ".ogg", ".webm",
+      ".db", ".sqlite", ".sqlite3", ".class", ".jar", ".wasm", ".pyc", ".o"
+    ],
+    "maxFileSize": 1048576
   }
 }
