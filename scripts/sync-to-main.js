@@ -240,7 +240,7 @@ function cleanPackageJson(mainPath) {
         key.includes('secretlint') ||
         key.includes('gitleaks') ||
         key.startsWith('secret-scan') ||
-        key.startsWith('security:') ||
+        key.startsWith('security') ||
         key.startsWith('dev:tmux:')
       ) {
         log(`   Removing script: ${key}`, 'cyan');
