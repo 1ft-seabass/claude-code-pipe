@@ -159,3 +159,6 @@ logs/
 # setup-securecheck: gitleaksバイナリ・実行ログ（ローカル専用、リポジトリに含めない）
 .security-check/bin/
 .security-check/logs/
+
+# commit-main: AIが事前に提案したコミットメッセージ案（一時ファイル、使用後に削除される）
+.commit-main-draft.json
