@@ -12,10 +12,21 @@ const { spawn } = require('child_process');
 const { parseLine } = require('./parser');
 const { extractProjectPath } = require('./subscribers');
 const { startNewSession, sendToSession, getManagedProcesses, killProcess, killAllProcesses, getOsInfo } = require('./sender');
-const { getGitStatus, getGitLog } = require('./git-info');
+const { getGitStatus, getGitLog, isPathGitIgnored } = require('./git-info');
 
 // package.json を読み込み
 const packageJson = require('../package.json');
+
+// /projects/file のデフォルト拒否拡張子（バイナリ・非表示対象）
+const DEFAULT_VIEWER_DENIED_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.zip', '.tar', '.gz', '.tgz', '.7z', '.rar',
+  '.exe', '.dll', '.so', '.dylib', '.bin', '.app',
+  '.woff', '.woff2', '.ttf', '.otf', '.eot',
+  '.mp3', '.mp4', '.mov', '.avi', '.wav', '.ogg', '.webm',
+  '.db', '.sqlite', '.sqlite3', '.class', '.jar', '.wasm', '.pyc', '.o'
+];
 
 /**
  * API ルーターを作成
@@ -903,6 +914,95 @@ function createApiRouter(watchDir, config) {
     } catch (error) {
       console.error('[api] Error saving attachment:', error);
       res.status(500).json({ error: 'Failed to save file' });
+    }
+  });
+
+  // POST /projects/file - projectPath 配下のテキストファイルの内容を返す
+  // body: { projectPath: string, filePath: string(相対パス) }
+  router.post('/projects/file', (req, res) => {
+    const { projectPath, filePath } = req.body;
+    if (!projectPath || !filePath) {
+      return res.status(400).json({ error: 'projectPath and filePath are required' });
+    }
+
+    if (!fs.existsSync(projectPath)) {
+      return res.status(400).json({ error: 'projectPath does not exist' });
+    }
+
+    let baseDir;
+    try {
+      baseDir = fs.realpathSync(path.resolve(projectPath));
+    } catch (error) {
+      return res.status(400).json({ error: 'projectPath does not exist' });
+    }
+
+    // symlink 解決前の字面上のパスでまず簡易チェック（無駄な fs アクセスを避ける）
+    const lexicalResolved = path.resolve(baseDir, filePath);
+    if (lexicalResolved !== baseDir && !lexicalResolved.startsWith(baseDir + path.sep)) {
+      return res.status(400).json({ error: 'filePath must resolve within projectPath' });
+    }
+
+    if (!fs.existsSync(lexicalResolved)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    let realPath;
+    try {
+      realPath = fs.realpathSync(lexicalResolved);
+    } catch (error) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // symlink 経由での projectPath 脱出を防ぐ
+    if (realPath !== baseDir && !realPath.startsWith(baseDir + path.sep)) {
+      return res.status(400).json({ error: 'filePath must resolve within projectPath' });
+    }
+
+    const relPath = path.relative(baseDir, realPath);
+
+    // ドットファイル・ドットディレクトリ（.env, .git, .ssh 等）は常にブロック
+    // secrets 系はここで拾う。中身を見たい場合は code-server 等を利用する
+    if (relPath.split(path.sep).some(segment => segment.startsWith('.'))) {
+      return res.status(400).json({ error: 'Hidden files/directories are not viewable via this API. Use code-server instead.' });
+    }
+
+    const ext = path.extname(realPath).toLowerCase();
+    const deniedExtensions = config.viewer?.deniedExtensions || DEFAULT_VIEWER_DENIED_EXTENSIONS;
+    if (deniedExtensions.includes(ext)) {
+      return res.status(400).json({ error: `File type not viewable via this API: ${ext || '(no extension)'}. Use code-server instead.` });
+    }
+
+    // .gitignore 対象は判定できる場合のみブロック（git リポジトリでない場合はベストエフォート）
+    if (isPathGitIgnored(baseDir, relPath) === true) {
+      return res.status(400).json({ error: 'File is git-ignored and not viewable via this API. Use code-server instead.' });
+    }
+
+    let stat;
+    try {
+      stat = fs.statSync(realPath);
+    } catch (error) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (!stat.isFile()) {
+      return res.status(400).json({ error: 'filePath must point to a regular file' });
+    }
+
+    const maxFileSize = config.viewer?.maxFileSize || 1024 * 1024; // 1MB
+    if (stat.size > maxFileSize) {
+      return res.status(413).json({ error: `File too large. Max size: ${maxFileSize} bytes` });
+    }
+
+    try {
+      const content = fs.readFileSync(realPath, 'utf8');
+      res.json({
+        content,
+        mtime: stat.mtime.toISOString(),
+        size: stat.size
+      });
+    } catch (error) {
+      console.error('[api] Error reading project file:', error);
+      res.status(500).json({ error: 'Failed to read file' });
     }
   });
 

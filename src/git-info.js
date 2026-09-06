@@ -5,7 +5,7 @@
  * エラーハンドリングにより、git が利用できない環境でも安全に動作します。
  */
 
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 /**
  * Git コマンドを実行するヘルパー関数
@@ -206,10 +206,30 @@ function getGitLog(projectPath, limit = 20) {
   };
 }
 
+/**
+ * 指定パスが .gitignore 等で無視対象かを判定
+ * @param {string} cwd - git リポジトリのルート（またはその配下）
+ * @param {string} relPath - cwd からの相対パス
+ * @returns {boolean|null} - true: 無視対象 / false: 対象外 / null: 判定不能（gitリポジトリでない等）
+ */
+function isPathGitIgnored(cwd, relPath) {
+  try {
+    // シェルを介さず引数として渡すことでコマンドインジェクションを回避
+    execFileSync('git', ['check-ignore', '-q', '--', relPath], { cwd, stdio: 'pipe' });
+    return true; // 終了コード 0 = 無視対象
+  } catch (error) {
+    if (error.status === 1) {
+      return false; // 終了コード 1 = 無視対象ではない
+    }
+    return null; // それ以外（gitリポジトリでない等）は判定不能
+  }
+}
+
 module.exports = {
   getGitInfo,
   getGitStatus,
   getGitLog,
+  isPathGitIgnored,
   execGitCommand,      // テスト用にエクスポート
   detectMainWorktree   // 既存スクリプト用
 };
