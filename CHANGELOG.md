@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-09-06
+
+### Added
+- **`POST /projects/file`**: Returns the content of a single text file within a project, for viewer UIs (e.g. pipe-viewer) to render notes/docs/source inline instead of only linking out to code-server
+  - Body: `{ projectPath, filePath }` (relative to `projectPath`, trusted-caller model consistent with `/git/status` and `/git/log`)
+  - Response: `{ content, mtime, size }`
+  - Path traversal and symlink escape outside `projectPath` are rejected (`400`)
+  - Any hidden file/directory (a path segment starting with `.`, e.g. `.env`, `.git/`, `.ssh/`) is always blocked, regardless of git status
+  - Files matched by `.gitignore` are blocked when the project is a git repository (best-effort — skipped if `projectPath` isn't a git repo)
+  - Binary/non-text extensions are blocked via `config.viewer.deniedExtensions` (images, archives, executables, fonts, media, etc. — configurable, defaults cover common binary types)
+  - File size is capped by `config.viewer.maxFileSize` (default 1MB, returns `413` if exceeded)
+
 ## [0.8.5] - 2026-08-11
 
 ### Fixed

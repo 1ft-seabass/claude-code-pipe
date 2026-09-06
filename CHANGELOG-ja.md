@@ -5,6 +5,23 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.6] - 2026-09-06
+
+### 追加
+- **`POST /projects/file`**: プロジェクト内の単一テキストファイルの内容を返すAPIを追加。pipe-viewerのようなビューワーUIが、ノートやドキュメント・ソースをリンク先で開かずその場で表示できるようにするためのものです
+  - リクエストボディ: `{ projectPath, filePath }`（`filePath`は`projectPath`からの相対パス。`/git/status` `/git/log`と同じく呼び出し元を信頼するモデル）
+  - レスポンス: `{ content, mtime, size }`
+  - `projectPath`外へのパストラバーサル・symlink経由の脱出は拒否（`400`）
+  - パスのいずれかのセグメントが`.`始まり（`.env`, `.git/`, `.ssh/`等）の隠しファイル・ディレクトリは常にブロック（gitの状態に関係なく）
+  - プロジェクトがgitリポジトリの場合、`.gitignore`対象のファイルもブロック（ベストエフォート。`projectPath`がgitリポジトリでない場合はスキップ）
+  - バイナリ・非テキスト拡張子は`config.viewer.deniedExtensions`でブロック（画像・アーカイブ・実行ファイル・フォント・メディア等、設定変更可能。デフォルトで一般的なバイナリ形式をカバー）
+  - ファイルサイズは`config.viewer.maxFileSize`で上限を設定（デフォルト1MB、超過時は`413`）
+
+## [0.8.5] - 2026-08-11
+
+### 修正
+- **プロセス起動前に `projectPath` の存在確認をするよう修正**: `/sessions/new` / `/sessions/:id/send` が、指定された作業ディレクトリがディスク上に実在するか（`fs.existsSync`）を事前にチェックし、存在しない場合は `spawn()` に到達して分かりにくい `ENOENT` を出す前に即座に `400 projectPath does not exist` を返すようになりました。これにより、壊れた `projectPath`（例: 旧 `extractProjectPath` のエンコードバグ由来）が `session-error` イベントで同じ壊れたパスをクライアントに送り返し、クライアント側がそれを保存して以降のリクエストで再送し続けるという自己増幅ループも防止されます
+
 ## [0.8.4] - 2026-07-08
 
 ### 追加
