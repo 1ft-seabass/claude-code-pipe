@@ -5,6 +5,12 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.7] - 2026-09-07
+
+### 追加
+- **`POST /projects/file`が画像に対応**: `config.viewer.imageExtensions`（デフォルト`.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.ico`, `.svg`）の拡張子はブロックされなくなり、base64エンコード＋`mimeType`付きで返す。viewer側は`` `data:${mimeType};base64,${content}` ``でそのまま表示可能な画像を組み立てられる。テキストのレスポンスには`encoding: "utf8"`フィールドが追加される（既存フィールドは無変更）。画像サイズ上限は`config.viewer.maxImageFileSize`で別途設定（デフォルト5MB）
+- **`GET /sessions/:id/messages`に`textOnly`・`limit`クエリパラメータを追加**: `?textOnly=true`で`tool_use`/`tool_result`コンテンツブロックと`isMeta`イベントを除いた`{ role, timestamp, text }`の配列に整形（本文が空になるターンは丸ごと除外）。`?limit=N`で（整形後の）配列の末尾N件に絞れる。「引き継ぎ用に直近数十ターンだけ」のような用途向け。どちらのパラメータも未指定時のデフォルト挙動は変更なし
+
 ## [0.8.6] - 2026-09-06
 
 ### 追加

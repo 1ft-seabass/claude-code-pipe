@@ -338,11 +338,13 @@ curl http://localhost:3100/sessions?detail=true
 
 #### `GET /sessions/:id/messages`
 
-セッションの全メッセージを取得します。
+セッションの全メッセージ（生のパース済みイベント）を取得します。
 
 **クエリパラメータ:**
 
 - `projectPath` (オプション): 同じセッション ID が異なるプロジェクトに存在する場合にプロジェクトパスでフィルタ
+- `textOnly` (オプション、`true`/`false`、デフォルト`false`): `true`にすると、生イベントの代わりに本文だけのシンプルな配列を返す。`tool_use`/`tool_result`コンテンツブロックと`isMeta`イベントは除去され、各ターンは`{ role, timestamp, text }`に整形される。本文が空になるターン（純粋なツール呼び出しやtool_resultのみのターン等）は丸ごと除外される
+- `limit` (オプション、数値): （`textOnly`適用後の）配列の末尾N件だけに絞る。「引き継ぎ用に直近数十ターンだけ」のような用途向け
 
 **リクエスト:**
 
@@ -351,28 +353,54 @@ curl http://localhost:3100/sessions/SESSION_ID/messages
 
 # projectPath フィルタ付き
 curl "http://localhost:3100/sessions/SESSION_ID/messages?projectPath=/path/to/project"
+
+# 本文だけのターン、末尾30件
+curl "http://localhost:3100/sessions/SESSION_ID/messages?textOnly=true&limit=30"
 ```
 
-**レスポンス:**
+**レスポンス（デフォルト、生イベント）:**
 
 ```json
 {
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
-  "messages": [
+  "events": [
     {
-      "role": "user",
-      "content": "Hello",
-      "timestamp": "2026-03-01T12:00:00.000Z"
+      "parentUuid": null,
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "uuid": "...",
+      "timestamp": "2026-03-01T12:00:00.000Z",
+      "isMeta": false,
+      "message": {
+        "role": "user",
+        "content": "Hello"
+      },
+      "tools": []
     },
     {
-      "role": "assistant",
-      "content": "Hello! How can I help you?",
+      "parentUuid": "...",
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "uuid": "...",
       "timestamp": "2026-03-01T12:00:05.000Z",
-      "usage": {
-        "input_tokens": 100,
-        "output_tokens": 50
-      }
+      "isMeta": false,
+      "message": {
+        "role": "assistant",
+        "content": [{ "type": "text", "text": "Hello! How can I help you?" }],
+        "usage": { "input_tokens": 100, "output_tokens": 50, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0 }
+      },
+      "tools": []
     }
+  ]
+}
+```
+
+**レスポンス（`textOnly=true`）:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "events": [
+    { "role": "user", "timestamp": "2026-03-01T12:00:00.000Z", "text": "Hello" },
+    { "role": "assistant", "timestamp": "2026-03-01T12:00:05.000Z", "text": "Hello! How can I help you?" }
   ]
 }
 ```
@@ -1209,7 +1237,7 @@ curl -X POST http://localhost:3100/attachments \
 
 #### `POST /projects/file`
 
-プロジェクト内の単一テキストファイルの内容を取得します。pipe-viewer のようなビューワーUIが、ファイルパスにリンクを張ってその場で中身を表示できるようにするためのものです（別エディタへのリンクのみに留めず）。
+プロジェクト内の単一テキスト・画像ファイルの内容を取得します。pipe-viewer のようなビューワーUIが、ファイルパスにリンクを張ってその場で中身を表示できるようにするためのものです（別エディタへのリンクのみに留めず）。
 
 `projectPath`は呼び出し元を信頼するモデル（`/git/status`や`/git/log`と同じ）です。呼び出し元は既にパスを把握している前提で、このAPI自体はファイル一覧を列挙しません。`filePath`は`projectPath`配下に収まるよう検証されます（パストラバーサル・symlink経由の脱出は拒否）。
 
@@ -1231,23 +1259,40 @@ curl -X POST http://localhost:3100/projects/file \
 | `projectPath` | string | Yes | プロジェクトディレクトリの絶対パス |
 | `filePath` | string | Yes | `projectPath` からの相対ファイルパス |
 
-**レスポンス:**
+**レスポンス（テキストファイル）:**
 
 ```json
 {
   "content": "# Example\n\nFile contents here...",
   "mtime": "2026-01-01T00:00:00.000Z",
-  "size": 1234
+  "size": 1234,
+  "encoding": "utf8"
 }
 ```
+
+**レスポンス（画像ファイル）:**
+
+```json
+{
+  "content": "<base64エンコードされたバイト列>",
+  "mtime": "2026-01-01T00:00:00.000Z",
+  "size": 45678,
+  "encoding": "base64",
+  "mimeType": "image/png"
+}
+```
+
+レスポンスからそのまま表示可能な画像を組み立てられます: `` `data:${mimeType};base64,${content}` ``。
 
 **レスポンスフィールド:**
 
 | フィールド | 型 | 説明 |
 |-------|------|-------------|
-| `content` | string | ファイルの中身（UTF-8テキスト） |
+| `content` | string | ファイルの中身。テキストならUTF-8、`encoding`が`"base64"`ならbase64エンコードされたバイト列 |
 | `mtime` | string | ISO 8601形式の最終更新日時 |
-| `size` | number | ファイルサイズ（バイト） |
+| `size` | number | ファイルサイズ（バイト。base64化後の長さではなく元のファイルサイズ） |
+| `encoding` | string | テキストなら`"utf8"`、画像なら`"base64"` |
+| `mimeType` | string | `encoding`が`"base64"`のときのみ存在（例: `"image/png"`） |
 
 **ブロックされる条件:**
 
@@ -1256,11 +1301,13 @@ curl -X POST http://localhost:3100/projects/file \
 | `filePath`が`projectPath`の外を指す（symlink経由含む） | `400` | パストラバーサル対策 |
 | パスのいずれかのセグメントが`.`始まり（`.env`, `.git/`, `.ssh/`等） | `400` | 隠しファイル・secrets系はこのAPIでは常に非対応。code-server等を利用 |
 | `.gitignore`対象（ベストエフォート。`projectPath`がgitリポジトリでない場合はスキップ） | `400` | ビルド成果物やローカルsecrets等、追跡対象外のファイルを範囲外に |
-| 拡張子がdenylistに該当 | `400` | 既知のバイナリ形式（画像・アーカイブ・実行ファイル・フォント・メディア等）をブロック |
+| 拡張子がdenylistに該当（かつ画像リストにも該当しない） | `400` | インライン表示を想定しないバイナリ形式（文書・アーカイブ・実行ファイル・フォント・音声/動画等）をブロック |
 | 通常ファイルでない | `400` | ディレクトリや特殊ファイルは拒否 |
-| サイズ上限超過 | `413` | デフォルト1MB |
+| サイズ上限超過 | `413` | テキストはデフォルト1MB、画像はデフォルト5MB |
 
-**サポートされる拡張子:** denylist方式。`config.viewer.deniedExtensions`で設定したバイナリ・危険な拡張子以外は基本的に閲覧可能（デフォルトは画像・アーカイブ・実行ファイル・フォント・メディア等の一般的な形式をカバー）。サイズ上限は`config.viewer.maxFileSize`で設定（デフォルト`1048576`バイト = 1MB）。
+**サポートされる拡張子:**
+- **テキスト**: `config.viewer.deniedExtensions`で設定したバイナリ・危険な拡張子以外は基本的に閲覧可能（デフォルトは文書・アーカイブ・実行ファイル・フォント・メディア等の一般的な形式をカバー）。サイズ上限は`config.viewer.maxFileSize`（デフォルト`1048576`バイト = 1MB）
+- **画像**: `config.viewer.imageExtensions`（デフォルト`.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.ico`, `.svg`）に該当する拡張子はブロックされず、base64エンコード＋`mimeType`付きで返す。サイズ上限は`config.viewer.maxImageFileSize`（デフォルト`5242880`バイト = 5MB）
 
 **エラーレスポンス:**
 

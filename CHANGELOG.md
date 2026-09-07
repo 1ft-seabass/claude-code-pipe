@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-09-07
+
+### Added
+- **`POST /projects/file` now supports images**: extensions in `config.viewer.imageExtensions` (default `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.ico`, `.svg`) are no longer blocked — they're returned base64-encoded with a `mimeType`, so viewers can build a displayable image directly (`data:${mimeType};base64,${content}`). Text responses gain an `encoding: "utf8"` field (additive, no breaking change). Image size is capped separately via `config.viewer.maxImageFileSize` (default 5MB)
+- **`GET /sessions/:id/messages` gains `textOnly` and `limit` query params**: `?textOnly=true` returns a simplified array of `{ role, timestamp, text }` turns with `tool_use`/`tool_result` content blocks and `isMeta` events stripped out (a turn whose text ends up empty is omitted entirely). `?limit=N` keeps only the last N entries of the (optionally filtered) array — useful for handoff-style "just the last few dozen turns" summaries. Neither param changes the default (unparameterized) response
+
 ## [0.8.6] - 2026-09-06
 
 ### Added

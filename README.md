@@ -36,6 +36,7 @@ It watches Claude Code's JSONL session files, provides REST APIs for interaction
 - **Webhook Distribution**: Send session events to external services (e.g., Node-RED, Slack)
 - **Git Info API**: Get repository status and commit log for any project via REST API
 - **File Upload API**: Upload files (images, text, PDF) in base64 format for use in sessions
+- **Project File Viewer API**: Get the content of a text or image file within a project (for viewer UIs like pipe-viewer), with path traversal / hidden file / `.gitignore` protection built in
 
 ## Platform Support
 

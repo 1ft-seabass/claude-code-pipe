@@ -17,9 +17,8 @@ const { getGitStatus, getGitLog, isPathGitIgnored } = require('./git-info');
 // package.json を読み込み
 const packageJson = require('../package.json');
 
-// /projects/file のデフォルト拒否拡張子（バイナリ・非表示対象）
+// /projects/file のデフォルト拒否拡張子（バイナリ・非表示対象。画像は別枠でbase64許可するため含まない）
 const DEFAULT_VIEWER_DENIED_EXTENSIONS = [
-  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg',
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
   '.zip', '.tar', '.gz', '.tgz', '.7z', '.rar',
   '.exe', '.dll', '.so', '.dylib', '.bin', '.app',
@@ -27,6 +26,20 @@ const DEFAULT_VIEWER_DENIED_EXTENSIONS = [
   '.mp3', '.mp4', '.mov', '.avi', '.wav', '.ogg', '.webm',
   '.db', '.sqlite', '.sqlite3', '.class', '.jar', '.wasm', '.pyc', '.o'
 ];
+
+// /projects/file でbase64許可する画像拡張子（見て検討する用途。テキストと違いbase64+encoding付きで返す）
+const DEFAULT_VIEWER_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg'];
+
+const IMAGE_MIME_TYPES = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.svg': 'image/svg+xml',
+};
 
 /**
  * API ルーターを作成
@@ -454,7 +467,26 @@ function createApiRouter(watchDir, config) {
     }
   });
 
+  // tool_use/tool_result/isMeta を除いた「本文だけのターン」に整形する
+  // 本文が空になるターン（tool_use/tool_resultのみ等）は自然に除外される
+  function extractTextTurn(event) {
+    if (event.isMeta) return null;
+    const msg = event.message;
+    if (!msg || !msg.role) return null;
+
+    const text = typeof msg.content === 'string'
+      ? msg.content
+      : Array.isArray(msg.content)
+        ? msg.content.filter(item => item.type === 'text').map(item => item.text).join('')
+        : '';
+
+    if (!text.trim()) return null;
+    return { role: msg.role, timestamp: event.timestamp, text };
+  }
+
   // GET /sessions/:id/messages - 全メッセージ一覧
+  // ?textOnly=true でtool_use/tool_result/isMetaを除いた本文だけの配列に整形
+  // ?limit=N で（整形後の）配列の末尾N件に絞る
   router.get('/sessions/:id/messages', async (req, res) => {
     try {
       const sessionId = req.params.id;
@@ -465,7 +497,17 @@ function createApiRouter(watchDir, config) {
         return res.status(404).json({ error: 'Session not found' });
       }
 
-      const events = await parseJSONLFile(jsonlPath);
+      let events = await parseJSONLFile(jsonlPath);
+
+      if (req.query.textOnly === 'true') {
+        events = events.map(extractTextTurn).filter(Boolean);
+      }
+
+      const limit = parseInt(req.query.limit, 10);
+      if (Number.isInteger(limit) && limit > 0) {
+        events = events.slice(-limit);
+      }
+
       res.json({
         sessionId,
         events
@@ -967,9 +1009,14 @@ function createApiRouter(watchDir, config) {
     }
 
     const ext = path.extname(realPath).toLowerCase();
-    const deniedExtensions = config.viewer?.deniedExtensions || DEFAULT_VIEWER_DENIED_EXTENSIONS;
-    if (deniedExtensions.includes(ext)) {
-      return res.status(400).json({ error: `File type not viewable via this API: ${ext || '(no extension)'}. Use code-server instead.` });
+    const imageExtensions = config.viewer?.imageExtensions || DEFAULT_VIEWER_IMAGE_EXTENSIONS;
+    const isImage = imageExtensions.includes(ext);
+
+    if (!isImage) {
+      const deniedExtensions = config.viewer?.deniedExtensions || DEFAULT_VIEWER_DENIED_EXTENSIONS;
+      if (deniedExtensions.includes(ext)) {
+        return res.status(400).json({ error: `File type not viewable via this API: ${ext || '(no extension)'}. Use code-server instead.` });
+      }
     }
 
     // .gitignore 対象は判定できる場合のみブロック（git リポジトリでない場合はベストエフォート）
@@ -988,18 +1035,32 @@ function createApiRouter(watchDir, config) {
       return res.status(400).json({ error: 'filePath must point to a regular file' });
     }
 
-    const maxFileSize = config.viewer?.maxFileSize || 1024 * 1024; // 1MB
-    if (stat.size > maxFileSize) {
-      return res.status(413).json({ error: `File too large. Max size: ${maxFileSize} bytes` });
+    const maxSize = isImage
+      ? (config.viewer?.maxImageFileSize || 5 * 1024 * 1024) // 5MB
+      : (config.viewer?.maxFileSize || 1024 * 1024); // 1MB
+    if (stat.size > maxSize) {
+      return res.status(413).json({ error: `File too large. Max size: ${maxSize} bytes` });
     }
 
     try {
-      const content = fs.readFileSync(realPath, 'utf8');
-      res.json({
-        content,
-        mtime: stat.mtime.toISOString(),
-        size: stat.size
-      });
+      if (isImage) {
+        const content = fs.readFileSync(realPath).toString('base64');
+        res.json({
+          content,
+          mtime: stat.mtime.toISOString(),
+          size: stat.size,
+          encoding: 'base64',
+          mimeType: IMAGE_MIME_TYPES[ext] || 'application/octet-stream'
+        });
+      } else {
+        const content = fs.readFileSync(realPath, 'utf8');
+        res.json({
+          content,
+          mtime: stat.mtime.toISOString(),
+          size: stat.size,
+          encoding: 'utf8'
+        });
+      }
     } catch (error) {
       console.error('[api] Error reading project file:', error);
       res.status(500).json({ error: 'Failed to read file' });
