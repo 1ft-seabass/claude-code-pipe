@@ -338,11 +338,13 @@ curl http://localhost:3100/sessions?detail=true
 
 #### `GET /sessions/:id/messages`
 
-Get all messages from a session.
+Get all messages (raw parsed events) from a session.
 
 **Query Parameters:**
 
 - `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+- `textOnly` (optional, `true`/`false`, default `false`): When `true`, returns a simplified array of text-only turns instead of raw events — `tool_use`/`tool_result` content blocks and `isMeta` events are dropped, and each turn is reduced to `{ role, timestamp, text }`. A turn whose text ends up empty (e.g. a pure tool call, or a tool-result-only turn) is omitted entirely
+- `limit` (optional, number): Keep only the last N entries of the (possibly `textOnly`-filtered) array. Useful for handoff-style "just the last few dozen turns" summaries
 
 **Request:**
 
@@ -351,28 +353,54 @@ curl http://localhost:3100/sessions/SESSION_ID/messages
 
 # With projectPath filter
 curl "http://localhost:3100/sessions/SESSION_ID/messages?projectPath=/path/to/project"
+
+# Text-only turns, last 30
+curl "http://localhost:3100/sessions/SESSION_ID/messages?textOnly=true&limit=30"
 ```
 
-**Response:**
+**Response (default, raw events):**
 
 ```json
 {
   "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
-  "messages": [
+  "events": [
     {
-      "role": "user",
-      "content": "Hello",
-      "timestamp": "2026-03-01T12:00:00.000Z"
+      "parentUuid": null,
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "uuid": "...",
+      "timestamp": "2026-03-01T12:00:00.000Z",
+      "isMeta": false,
+      "message": {
+        "role": "user",
+        "content": "Hello"
+      },
+      "tools": []
     },
     {
-      "role": "assistant",
-      "content": "Hello! How can I help you?",
+      "parentUuid": "...",
+      "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+      "uuid": "...",
       "timestamp": "2026-03-01T12:00:05.000Z",
-      "usage": {
-        "input_tokens": 100,
-        "output_tokens": 50
-      }
+      "isMeta": false,
+      "message": {
+        "role": "assistant",
+        "content": [{ "type": "text", "text": "Hello! How can I help you?" }],
+        "usage": { "input_tokens": 100, "output_tokens": 50, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0 }
+      },
+      "tools": []
     }
+  ]
+}
+```
+
+**Response (`textOnly=true`):**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "events": [
+    { "role": "user", "timestamp": "2026-03-01T12:00:00.000Z", "text": "Hello" },
+    { "role": "assistant", "timestamp": "2026-03-01T12:00:05.000Z", "text": "Hello! How can I help you?" }
   ]
 }
 ```
@@ -1209,7 +1237,7 @@ curl -X POST http://localhost:3100/attachments \
 
 #### `POST /projects/file`
 
-Get the content of a single text file within a project. Intended for viewer UIs (e.g. pipe-viewer) that link to a file path and want to render it inline instead of only linking out to a separate editor.
+Get the content of a single text or image file within a project. Intended for viewer UIs (e.g. pipe-viewer) that link to a file path and want to render it inline instead of only linking out to a separate editor.
 
 `projectPath` is trusted (same model as `/git/status` and `/git/log` — the caller is expected to already know the path, this endpoint does not enumerate or list files). `filePath` is validated to stay within `projectPath` (path traversal and symlink escapes are rejected).
 
@@ -1231,23 +1259,40 @@ curl -X POST http://localhost:3100/projects/file \
 | `projectPath` | string | Yes | Absolute path to the project directory |
 | `filePath` | string | Yes | Path to the file, relative to `projectPath` |
 
-**Response:**
+**Response (text file):**
 
 ```json
 {
   "content": "# Example\n\nFile contents here...",
   "mtime": "2026-01-01T00:00:00.000Z",
-  "size": 1234
+  "size": 1234,
+  "encoding": "utf8"
 }
 ```
+
+**Response (image file):**
+
+```json
+{
+  "content": "<base64-encoded bytes>",
+  "mtime": "2026-01-01T00:00:00.000Z",
+  "size": 45678,
+  "encoding": "base64",
+  "mimeType": "image/png"
+}
+```
+
+Build a displayable image directly from the response: `` `data:${mimeType};base64,${content}` ``.
 
 **Response Fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `content` | string | File contents (UTF-8 text) |
+| `content` | string | File contents — UTF-8 text, or base64-encoded bytes when `encoding` is `"base64"` |
 | `mtime` | string | ISO 8601 last-modified time |
-| `size` | number | File size in bytes |
+| `size` | number | File size in bytes (original file size, not the base64 length) |
+| `encoding` | string | `"utf8"` for text files, `"base64"` for image files |
+| `mimeType` | string | Only present when `encoding` is `"base64"` (e.g. `"image/png"`) |
 
 **What gets blocked (and why):**
 
@@ -1256,11 +1301,13 @@ curl -X POST http://localhost:3100/projects/file \
 | `filePath` resolves outside `projectPath` (including via symlink) | `400` | Path traversal protection |
 | Any path segment starts with `.` (e.g. `.env`, `.git/`, `.ssh/`) | `400` | Hidden files/secrets are never viewable via this API — use code-server instead |
 | File matches `.gitignore` (best-effort; skipped if `projectPath` isn't a git repo) | `400` | Keeps untracked/ignored files (build output, local secrets) out of scope |
-| Extension is in the denylist | `400` | Blocks known binary formats (images, archives, executables, fonts, media, etc.) |
+| Extension is in the denylist (and not in the image list) | `400` | Blocks binary formats not meant for inline viewing (documents, archives, executables, fonts, audio/video, etc.) |
 | Not a regular file | `400` | Directories and special files are rejected |
-| File exceeds size limit | `413` | Default 1MB |
+| File exceeds size limit | `413` | Default 1MB for text, 5MB for images |
 
-**Supported Extensions:** denylist-based — everything is viewable except binary/risky extensions configured via `config.viewer.deniedExtensions` (default covers common images, archives, executables, fonts, and media formats). Configure via `config.viewer.maxFileSize` for the size cap (default `1048576` bytes / 1MB).
+**Supported Extensions:**
+- **Text**: everything is viewable except binary/risky extensions configured via `config.viewer.deniedExtensions` (default covers documents, archives, executables, fonts, and media formats). Size cap via `config.viewer.maxFileSize` (default `1048576` bytes / 1MB).
+- **Images**: extensions in `config.viewer.imageExtensions` (default `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.ico`, `.svg`) are returned base64-encoded with a `mimeType`, instead of being blocked. Size cap via `config.viewer.maxImageFileSize` (default `5242880` bytes / 5MB).
 
 **Error Responses:**
 

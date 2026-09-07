@@ -29,7 +29,6 @@
   },
   "viewer": {
     "deniedExtensions": [
-      ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico", ".svg",
       ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
       ".zip", ".tar", ".gz", ".tgz", ".7z", ".rar",
       ".exe", ".dll", ".so", ".dylib", ".bin", ".app",
@@ -37,6 +36,8 @@
       ".mp3", ".mp4", ".mov", ".avi", ".wav", ".ogg", ".webm",
       ".db", ".sqlite", ".sqlite3", ".class", ".jar", ".wasm", ".pyc", ".o"
     ],
-    "maxFileSize": 1048576
+    "imageExtensions": [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".ico", ".svg"],
+    "maxFileSize": 1048576,
+    "maxImageFileSize": 5242880
   }
 }
