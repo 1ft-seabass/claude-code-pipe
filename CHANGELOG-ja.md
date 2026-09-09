@@ -5,6 +5,11 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.8] - 2026-09-09
+
+### 追加
+- **`POST /attachments`のデフォルト`allowedExtensions`に`.docx`, `.xlsx`, `.csv`を追加**: `config.json`で`config.upload.allowedExtensions`を設定していない場合に使われる組み込みフォールバック値が、既存の`.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`に加えてオフィス文書形式もカバーするようになった。`config.upload.allowedExtensions`を明示指定した場合はこのデフォルトを完全に上書きする(マージではない)点は変わらず
+
 ## [0.8.7] - 2026-09-07
 
 ### 追加

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-09-09
+
+### Added
+- **`POST /attachments` default `allowedExtensions` now includes `.docx`, `.xlsx`, `.csv`**: the built-in fallback used when `config.upload.allowedExtensions` is not set in `config.json` now covers common office document formats alongside the existing `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`. Setting `config.upload.allowedExtensions` explicitly still fully overrides this default (not merged)
+
 ## [0.8.7] - 2026-09-07
 
 ### Added
