@@ -1174,7 +1174,7 @@ curl http://localhost:3100/attachments-config
 ```json
 {
   "maxBodySize": "10mb",
-  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md", ".docx", ".xlsx", ".csv"]
 }
 ```
 
@@ -1207,7 +1207,7 @@ curl -X POST http://localhost:3100/attachments \
 | `data` | string | Yes | Base64-encoded file content |
 | `filename` | string | Yes | Original filename (used for extension validation and safe naming) |
 
-**Supported Extensions:** configurable via `config.upload.allowedExtensions` (default: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`)
+**Supported Extensions:** configurable via `config.upload.allowedExtensions` (default: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`, `.docx`, `.xlsx`, `.csv`)
 
 **Response:**
 

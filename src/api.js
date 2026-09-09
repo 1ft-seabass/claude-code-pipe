@@ -923,7 +923,7 @@ function createApiRouter(watchDir, config) {
   router.get('/attachments-config', (req, res) => {
     res.json({
       maxBodySize: config.upload?.maxBodySize || '10mb',
-      allowedExtensions: config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md']
+      allowedExtensions: config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md', '.docx', '.xlsx', '.csv']
     });
   });
 
@@ -936,7 +936,7 @@ function createApiRouter(watchDir, config) {
     }
 
     const ext = path.extname(filename).toLowerCase();
-    const allowed = config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md'];
+    const allowed = config.upload?.allowedExtensions || ['.jpg', '.jpeg', '.png', '.pdf', '.txt', '.md', '.docx', '.xlsx', '.csv'];
     if (!allowed.includes(ext)) {
       return res.status(400).json({ error: `File type not allowed. Allowed: ${allowed.join(', ')}` });
     }
