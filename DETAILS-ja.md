@@ -1174,7 +1174,7 @@ curl http://localhost:3100/attachments-config
 ```json
 {
   "maxBodySize": "10mb",
-  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+  "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md", ".docx", ".xlsx", ".csv"]
 }
 ```
 
@@ -1207,7 +1207,7 @@ curl -X POST http://localhost:3100/attachments \
 | `data` | string | Yes | base64 エンコードされたファイルコンテンツ |
 | `filename` | string | Yes | 元のファイル名（拡張子検証とサニタイズに使用） |
 
-**サポートされる拡張子:** `config.upload.allowedExtensions` で設定可能（デフォルト: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`）
+**サポートされる拡張子:** `config.upload.allowedExtensions` で設定可能（デフォルト: `.jpg`, `.jpeg`, `.png`, `.pdf`, `.txt`, `.md`, `.docx`, `.xlsx`, `.csv`）
 
 **レスポンス:**
 

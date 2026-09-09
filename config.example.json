@@ -25,7 +25,7 @@
   },
   "upload": {
     "maxBodySize": "10mb",
-    "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md"]
+    "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md", ".docx", ".xlsx", ".csv"]
   },
   "viewer": {
     "deniedExtensions": [
