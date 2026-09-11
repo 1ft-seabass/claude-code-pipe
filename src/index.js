@@ -11,7 +11,7 @@ const path = require('path');
 const config = require('../config.json');
 const packageJson = require('../package.json');
 const JSONLWatcher = require('./watcher');
-const { createApiRouter } = require('./api');
+const { createApiRouter, cleanupOldAttachments } = require('./api');
 const { setupWebSocket } = require('./websocket');
 const { setupSubscribers } = require('./subscribers');
 const { startNewSession, sendToSession, getManagedProcesses, processEvents } = require('./sender');
@@ -221,6 +221,10 @@ server.listen(port, () => {
   watcher.start().catch((error) => {
     console.error('[index] Failed to start watcher:', error);
   });
+
+  // 古い添付ファイルの掃除（起動時 + 1時間ごと）
+  cleanupOldAttachments(config);
+  setInterval(() => cleanupOldAttachments(config), 60 * 60 * 1000);
 });
 
 // Graceful shutdown

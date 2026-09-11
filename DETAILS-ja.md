@@ -1189,6 +1189,8 @@ curl http://localhost:3100/attachments-config
 
 base64 エンコードされたファイル（画像・テキスト・PDF）をアップロードします。ファイルは UUID プレフィックス付きで `/tmp/claude-code-pipe/` に保存されます。
 
+**自動クリーンアップ:** `config.upload.maxAgeDays`（デフォルト`7`）より古いファイルは、サーバー起動時および以降1時間ごとに、mtime基準で自動削除されます。
+
 **リクエスト:**
 
 ```bash
