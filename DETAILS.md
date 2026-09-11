@@ -1189,6 +1189,8 @@ curl http://localhost:3100/attachments-config
 
 Upload a file (image, text, PDF) encoded as base64. The file is saved to `/tmp/claude-code-pipe/` with a UUID prefix.
 
+**Cleanup:** files older than `config.upload.maxAgeDays` (default `7`) are automatically deleted on server start and every hour thereafter, based on file mtime.
+
 **Request:**
 
 ```bash

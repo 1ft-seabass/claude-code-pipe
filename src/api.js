@@ -17,6 +17,40 @@ const { getGitStatus, getGitLog, isPathGitIgnored } = require('./git-info');
 // package.json を読み込み
 const packageJson = require('../package.json');
 
+// /attachments の保存先
+const ATTACHMENTS_TMP_DIR = '/tmp/claude-code-pipe';
+
+// /attachments に保存されたファイルのうち、maxAgeDays より古いものを削除する
+// （config.upload.maxAgeDays 未設定時は 7 日）
+function cleanupOldAttachments(config) {
+  const maxAgeDays = config.upload?.maxAgeDays || 7;
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(ATTACHMENTS_TMP_DIR, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return;
+    console.error('[api] Error reading attachments dir for cleanup:', error);
+    return;
+  }
+
+  const now = Date.now();
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const filePath = path.join(ATTACHMENTS_TMP_DIR, entry.name);
+    try {
+      const stat = fs.statSync(filePath);
+      if (now - stat.mtimeMs > maxAgeMs) {
+        fs.unlinkSync(filePath);
+        console.log(`[api] Cleaned up old attachment: ${entry.name}`);
+      }
+    } catch (error) {
+      console.error(`[api] Error cleaning up attachment ${entry.name}:`, error);
+    }
+  }
+}
+
 // /projects/file のデフォルト拒否拡張子（バイナリ・非表示対象。画像は別枠でbase64許可するため含まない）
 const DEFAULT_VIEWER_DENIED_EXTENSIONS = [
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
@@ -942,7 +976,7 @@ function createApiRouter(watchDir, config) {
     }
 
     const safeName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
-    const tmpDir = '/tmp/claude-code-pipe';
+    const tmpDir = ATTACHMENTS_TMP_DIR;
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const uuid = crypto.randomUUID();
@@ -1110,5 +1144,6 @@ function createApiRouter(watchDir, config) {
 }
 
 module.exports = {
-  createApiRouter
+  createApiRouter,
+  cleanupOldAttachments
 };
