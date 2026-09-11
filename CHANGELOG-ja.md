@@ -5,6 +5,11 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.8.9] - 2026-09-11
+
+### 追加
+- **`/attachments`の古いファイルを自動クリーンアップ**: `/tmp/claude-code-pipe/`内の`config.upload.maxAgeDays`(デフォルト7日)より古いファイルを、サーバー起動時および以降1時間ごとに、mtime基準で自動削除する
+
 ## [0.8.8] - 2026-09-09
 
 ### 追加
