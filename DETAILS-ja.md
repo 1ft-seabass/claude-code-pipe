@@ -861,6 +861,44 @@ curl http://localhost:3100/version
 | `version` | string | 現在のバージョン（package.json より） |
 | `description` | string | パッケージの説明 |
 
+#### `GET /info`
+
+このpipeの現在の設定状態を取得します。初回接続時のviewer側の把握・デバッグ用です。継続的なステータス把握には、このエンドポイントをポーリングするのではなく、全webhookペイロードに含まれる`communicationMode`フィールドを使う方が適しています。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/info
+```
+
+**レスポンス:**
+
+```json
+{
+  "version": "0.8.9",
+  "os": "linux",
+  "communicationMode": "bidirectional",
+  "callbackUrl": "http://viewer1:3100",
+  "mqttCommandTopic": "claude/pipe-A/send",
+  "subscriberCount": 2,
+  "projectTitle": "My Project",
+  "watchDir": "~/.claude/projects"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `version` | string | 現在のバージョン（package.json より） |
+| `os` | string | `"linux"`、`"mac"`、`"windows"`のいずれか（WSLは`"linux"`として報告） |
+| `communicationMode` | string | `"watch-only"`（subscriberなし）、`"webhook-only"`（subscriberはあるが`callbackUrl`/`mqtt.commandTopic`なし）、`"bidirectional"`（subscriberがあり`callbackUrl`および/または`mqtt.commandTopic`もあり） |
+| `callbackUrl` | string\|null | `config.callbackUrl`。未設定時は`null` |
+| `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`。MQTT未設定時は`null`。brokerのURL・認証情報は一切含まれない |
+| `subscriberCount` | number | 設定済み`subscribers`の件数 |
+| `projectTitle` | string\|null | `config.projectTitle`。未設定時は`null` |
+| `watchDir` | string | `config.watchDir` |
+
 #### `GET /projects`
 
 全プロジェクトとそのセッションをリスト表示します。

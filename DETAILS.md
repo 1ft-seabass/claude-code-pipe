@@ -861,6 +861,44 @@ curl http://localhost:3100/version
 | `version` | string | Current version (from package.json) |
 | `description` | string | Package description |
 
+#### `GET /info`
+
+Get this pipe's current configuration state. Useful for initial viewer connection / debugging. For ongoing status, prefer the `communicationMode` field included in every webhook payload instead of polling this endpoint.
+
+**Request:**
+
+```bash
+curl http://localhost:3100/info
+```
+
+**Response:**
+
+```json
+{
+  "version": "0.8.9",
+  "os": "linux",
+  "communicationMode": "bidirectional",
+  "callbackUrl": "http://viewer1:3100",
+  "mqttCommandTopic": "claude/pipe-A/send",
+  "subscriberCount": 2,
+  "projectTitle": "My Project",
+  "watchDir": "~/.claude/projects"
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | Current version (from package.json) |
+| `os` | string | `"linux"`, `"mac"`, or `"windows"` (WSL is reported as `"linux"`) |
+| `communicationMode` | string | `"watch-only"` (no subscribers), `"webhook-only"` (subscribers but no `callbackUrl`/`mqtt.commandTopic`), or `"bidirectional"` (subscribers with `callbackUrl` and/or `mqtt.commandTopic`) |
+| `callbackUrl` | string\|null | `config.callbackUrl`, or `null` if unset |
+| `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`, or `null` if MQTT is unset. Broker URL/credentials are never included |
+| `subscriberCount` | number | Number of configured `subscribers` |
+| `projectTitle` | string\|null | `config.projectTitle`, or `null` if unset |
+| `watchDir` | string | `config.watchDir` |
+
 #### `GET /projects`
 
 List all projects with their sessions.
