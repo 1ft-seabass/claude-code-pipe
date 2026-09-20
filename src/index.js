@@ -1,7 +1,7 @@
 /**
  * index.js - エントリポイント
  *
- * Express + ws を同一ポートで起動し、各モジュールを組み立てる。
+ * Express サーバーを起動し、各モジュールを組み立てる。
  */
 
 const express = require('express');
@@ -12,10 +12,10 @@ const config = require('../config.json');
 const packageJson = require('../package.json');
 const JSONLWatcher = require('./watcher');
 const { createApiRouter, cleanupOldAttachments } = require('./api');
-const { setupWebSocket } = require('./websocket');
 const { setupSubscribers } = require('./subscribers');
 const { startNewSession, sendToSession, getManagedProcesses, processEvents } = require('./sender');
 const { cancel } = require('./canceller');
+const { setupMqttReceiver } = require('./mqtt-receiver');
 
 // Express アプリケーションを作成
 const app = express();
@@ -79,9 +79,6 @@ const watcher = new JSONLWatcher(config.watchDir);
 // Watch 系 API ルーターをマウント
 const apiRouter = createApiRouter(config.watchDir, config);
 app.use('/', apiRouter);
-
-// WebSocket をセットアップ
-setupWebSocket(server, watcher);
 
 // subscribers をセットアップ
 setupSubscribers(config.subscribers, watcher, processEvents, config);
@@ -214,6 +211,8 @@ app.get('/health', (req, res) => {
 // サーバー起動
 const port = config.port || 3100;
 
+let mqttClient = null;
+
 server.listen(port, () => {
   console.log(`claude-code-pipe v${packageJson.version} listening on port ${port}`);
 
@@ -225,12 +224,16 @@ server.listen(port, () => {
   // 古い添付ファイルの掃除（起動時 + 1時間ごと）
   cleanupOldAttachments(config);
   setInterval(() => cleanupOldAttachments(config), 60 * 60 * 1000);
+
+  // MQTT コマンド受信チャネル（config.mqtt 未設定時は何もしない）
+  mqttClient = setupMqttReceiver(config);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\n[index] Shutting down...');
   await watcher.stop();
+  if (mqttClient) mqttClient.end();
   logStream.end();
   server.close(() => {
     console.log('[index] Server closed');
@@ -241,6 +244,7 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   console.log('\n[index] Shutting down...');
   await watcher.stop();
+  if (mqttClient) mqttClient.end();
   logStream.end();
   server.close(() => {
     console.log('[index] Server closed');

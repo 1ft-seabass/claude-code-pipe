@@ -656,25 +656,6 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?p
 > **Difference from existing endpoints (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`):**
 > Existing endpoints filter by `role` only, so `tool_result` (user role) and `tool_use` (assistant role) may be included. The `chat` versions check content type and return only pure conversation messages.
 
-#### `WS /ws`
-
-WebSocket endpoint for real-time session events.
-
-**Connection:**
-
-```javascript
-const ws = new WebSocket('ws://localhost:3100/ws');
-
-ws.on('message', (data) => {
-  const event = JSON.parse(data);
-  console.log(event);
-});
-```
-
-**Events:**
-
-Same format as webhook events (see [Webhook Event Format](#webhook-event-format)).
-
 ### Send Mode
 
 #### `POST /sessions/new`
@@ -772,6 +753,56 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 
 > **Note:** `model` reflects the actual model used for this turn. Specifying `model` in the request body does not guarantee the same model will be used in future turns unless specified again.
 
+### MQTT Command Channel
+
+An alternative to the REST Send API for triggering sessions. Event delivery (pipe → viewer) always stays on HTTP webhook; MQTT is used only for command reception (viewer → pipe), configured independently via `config.mqtt`.
+
+**Configuration:**
+
+```json
+{
+  "mqtt": {
+    "url": "mqtts://broker.example.com:8883",
+    "username": "your-username",
+    "password": "YOUR_PASSWORD",
+    "commandTopic": "claude/pipe-A/send"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | Broker URL. `mqtt://` (plain) or `mqtts://` (TLS) |
+| `username` | string | No | Username, if the broker requires authentication |
+| `password` | string | No | Password, if the broker requires authentication |
+| `commandTopic` | string | Yes | Topic this pipe subscribes to for incoming commands |
+
+If `config.mqtt` is omitted, the MQTT channel is disabled entirely (no connection attempt).
+
+**Command payload** (published by the viewer to `commandTopic`):
+
+```json
+{
+  "prompt": "Your prompt here",
+  "projectPath": "/path/to/project",
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "model": "sonnet"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `prompt` | string | Yes | Prompt to send |
+| `projectPath` | string | No | Working directory for a **new** session. Ignored when `sessionId` is present |
+| `sessionId` | string | No | If present, the prompt is sent to this existing session (`--resume`). If absent, a new session is started |
+| `model` | string | No | Model to use |
+
+Dispatch uses `config.send.defaultAllowedTools` (same as the REST Send API). QoS is fixed at 0 (fire-and-forget) — there is no delivery acknowledgement back to the publisher, and commands published while the broker connection is down are lost silently.
+
+**Security note:** `mqtt.password` is never exposed. Only `commandTopic` is included in webhook payloads (as `mqttCommandTopic`) and `GET /info`, so viewers can discover where to publish commands without learning broker credentials.
+
+**Platform note:** Windows native does not support `claude -p` (requires `node-pty`). If `config.mqtt` is set on Windows native, the channel logs a warning at startup and does not connect.
+
 ### Cancel Mode
 
 #### `POST /sessions/:id/cancel`
@@ -818,7 +849,7 @@ curl http://localhost:3100/version
 {
   "name": "claude-code-pipe",
   "version": "0.5.0",
-  "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket"
+  "description": "A pipe for Claude Code input/output using JSONL and Express"
 }
 ```
 
@@ -1689,7 +1720,6 @@ claude-code-pipe/
 - Main entry point
 - Express server setup
 - Authentication middleware (Bearer Token)
-- WebSocket server for local Web UI
 - Route registration
 
 #### src/api.js
