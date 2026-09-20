@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-20
+
+### Added
+- **MQTT command channel**: `config.mqtt` (`url`, `username`, `password`, `commandTopic`) lets viewers trigger sessions over MQTT/MQTTS instead of the REST Send API. Subscribes to `commandTopic` at QoS 0 and dispatches `{ prompt, projectPath?, sessionId?, model? }` payloads to `startNewSession`/`sendToSession`. Disabled by default (no `config.mqtt` = no connection attempt); not supported on Windows native (`claude -p` requires `node-pty`). See [MQTT design spec](docs/notes/2026-06-20-23-47-00-mqtt-design-spec.md) for background
+- **`GET /info`**: now documented (was implemented since v0.8.3 but missing from DETAILS.md/DETAILS-ja.md)
+
+### Removed
+- **`WS /ws` (WebSocket endpoint)**: removed entirely, along with the `ws` dependency. It saw effectively no real-world use and bypassed `authMiddleware` (the `ws` library's `{ server }` mode hooks the HTTP server's `upgrade` event directly, outside Express's middleware chain). The MQTT command channel is its intended replacement for bidirectional communication
+
+### Fixed
+- **Dead code in `src/index.js`**: `POST /sessions/new` and `POST /sessions/:id/send` were defined twice (once in `src/api.js`, once in `src/index.js`). Since `src/api.js`'s router is mounted first, the `src/index.js` copies (a simplified, `prompt`-only version) were always shadowed and never executed. Removed the unreachable copies; behavior is unchanged since `src/api.js`'s versions were already the ones handling every request
+
 ## [0.8.9] - 2026-09-11
 
 ### Added
