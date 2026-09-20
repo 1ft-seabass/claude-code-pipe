@@ -13,7 +13,7 @@ const packageJson = require('../package.json');
 const JSONLWatcher = require('./watcher');
 const { createApiRouter, cleanupOldAttachments } = require('./api');
 const { setupSubscribers } = require('./subscribers');
-const { startNewSession, sendToSession, getManagedProcesses, processEvents } = require('./sender');
+const { getManagedProcesses, processEvents } = require('./sender');
 const { cancel } = require('./canceller');
 const { setupMqttReceiver } = require('./mqtt-receiver');
 
@@ -105,76 +105,6 @@ processEvents.on('cancel-initiated', (event) => {
 
 processEvents.on('process-exit', (event) => {
   writeLog('process-exit', event);
-});
-
-// Send 系 API エンドポイント
-// POST /sessions/new - 新しいセッションを開始
-app.post('/sessions/new', async (req, res) => {
-  const { prompt, cwd } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'prompt is required' });
-  }
-
-  const allowedTools = config.send.defaultAllowedTools || [];
-
-  try {
-    const result = await startNewSession(prompt, {
-      cwd,
-      allowedTools,
-      projectPath: cwd,
-      onData: (data) => {
-        // stdout データ（必要に応じて WebSocket に配信するなど）
-        console.log('[index] stdout:', data);
-      },
-      onError: (data) => {
-        // stderr データ
-        console.error('[index] stderr:', data);
-      },
-      onExit: (code, signal) => {
-        // プロセス終了
-        console.log(`[index] Process exited: code=${code}, signal=${signal}`);
-      }
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('[index] Error starting new session:', error);
-    res.status(500).json({ error: 'Failed to start new session' });
-  }
-});
-
-// POST /sessions/:id/send - 既存セッションに送信
-app.post('/sessions/:id/send', (req, res) => {
-  const sessionId = req.params.id;
-  const { prompt } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'prompt is required' });
-  }
-
-  const allowedTools = config.send.defaultAllowedTools || [];
-
-  try {
-    const result = sendToSession(sessionId, prompt, {
-      allowedTools,
-      projectPath: null,  // 既存セッションはcwdを持っていない
-      onData: (data) => {
-        console.log('[index] stdout:', data);
-      },
-      onError: (data) => {
-        console.error('[index] stderr:', data);
-      },
-      onExit: (code, signal) => {
-        console.log(`[index] Process exited: code=${code}, signal=${signal}`);
-      }
-    });
-
-    res.json(result);
-  } catch (error) {
-    console.error('[index] Error sending to session:', error);
-    res.status(500).json({ error: 'Failed to send to session' });
-  }
 });
 
 // Cancel 系 API エンドポイント
