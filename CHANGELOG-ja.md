@@ -5,6 +5,18 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.9.0] - 2026-09-20
+
+### 追加
+- **MQTTコマンドチャネル**: `config.mqtt`(`url`, `username`, `password`, `commandTopic`)により、REST版Send APIの代わりにMQTT/MQTTS経由でviewerがセッションをトリガーできるようになった。`commandTopic`をQoS 0で購読し、`{ prompt, projectPath?, sessionId?, model? }`ペイロードを`startNewSession`/`sendToSession`にディスパッチする。デフォルトでは無効(`config.mqtt`未設定なら接続を試みない)。Windows nativeは非対応(`claude -p`に`node-pty`が必要なため)。背景は[MQTT設計仕様](docs/notes/2026-06-20-23-47-00-mqtt-design-spec.md)を参照
+- **`GET /info`**: ドキュメント化(実装自体はv0.8.3から存在していたが、DETAILS.md/DETAILS-ja.mdへの記載が漏れていた)
+
+### 削除
+- **`WS /ws`(WebSocketエンドポイント)**: `ws`依存ごと完全に廃止。実利用がほぼゼロで、`authMiddleware`を素通りする穴もあった(`ws`ライブラリの`{ server }`モードはHTTPサーバーの`upgrade`イベントに直接フックし、Expressのミドルウェアチェーンを経由しないため)。双方向通信の代替としてMQTTコマンドチャネルを実装
+
+### 修正
+- **`src/index.js`のデッドコード**: `POST /sessions/new`と`POST /sessions/:id/send`が`src/api.js`と`src/index.js`の両方に定義されていた。`src/api.js`側のrouterが先にマウントされるため、`src/index.js`側(`prompt`のみ対応の簡易版)は常にシャドウされ一度も実行されていなかった。到達不能なコピーを削除。`src/api.js`側の実装が元々すべてのリクエストを処理していたため挙動に変化なし
+
 ## [0.8.9] - 2026-09-11
 
 ### 追加

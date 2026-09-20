@@ -23,6 +23,12 @@
     "defaultAllowedTools": ["Read", "LS", "Grep", "Write", "Bash"],
     "cancelTimeoutMs": 3000
   },
+  "mqtt": {
+    "url": "mqtts://broker.example.com:8883",
+    "username": "",
+    "password": "",
+    "commandTopic": "claude/pipe-A/send"
+  },
   "upload": {
     "maxBodySize": "10mb",
     "allowedExtensions": [".jpg", ".jpeg", ".png", ".pdf", ".txt", ".md", ".docx", ".xlsx", ".csv"],

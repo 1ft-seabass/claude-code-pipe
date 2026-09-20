@@ -656,25 +656,6 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?p
 > **既存エンドポイント (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`) との違い:**
 > 既存エンドポイントは `role` のみでフィルタするため、`tool_result`（user role）や `tool_use`（assistant role）が含まれることがあります。`chat` 版は content type を確認し、純粋な会話メッセージのみを返します。
 
-#### `WS /ws`
-
-リアルタイムセッションイベント用の WebSocket エンドポイント。
-
-**接続:**
-
-```javascript
-const ws = new WebSocket('ws://localhost:3100/ws');
-
-ws.on('message', (data) => {
-  const event = JSON.parse(data);
-  console.log(event);
-});
-```
-
-**イベント:**
-
-Webhook イベントと同じフォーマット（[Webhook イベントフォーマット](#webhook-イベントフォーマット)参照）。
-
 ### Send Mode
 
 #### `POST /sessions/new`
@@ -772,6 +753,56 @@ curl -X POST http://localhost:3100/sessions/SESSION_ID/send \
 
 > **Note:** `model` はそのターンで実際に使用されたモデルを示します。リクエストで `model` を指定しても、次のターンでは再指定しない限り同じモデルが使われる保証はありません。
 
+### MQTT コマンドチャネル
+
+REST版Send APIの代替として、MQTT経由でセッションをトリガーできます。イベント配信(pipe→viewer)は常にHTTP webhookのまま変わらず、MQTTはコマンド受信(viewer→pipe)専用で、`config.mqtt`により独立して設定します。
+
+**設定:**
+
+```json
+{
+  "mqtt": {
+    "url": "mqtts://broker.example.com:8883",
+    "username": "your-username",
+    "password": "YOUR_PASSWORD",
+    "commandTopic": "claude/pipe-A/send"
+  }
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `url` | string | Yes | brokerのURL。`mqtt://`（平文）または`mqtts://`（TLS） |
+| `username` | string | No | brokerが認証を要求する場合のユーザー名 |
+| `password` | string | No | brokerが認証を要求する場合のパスワード |
+| `commandTopic` | string | Yes | このpipeがコマンド受信のために購読するトピック |
+
+`config.mqtt`を省略した場合、MQTTチャネルは完全に無効になります(接続を試みません)。
+
+**コマンドペイロード**（viewerが`commandTopic`にpublishする内容）:
+
+```json
+{
+  "prompt": "Your prompt here",
+  "projectPath": "/path/to/project",
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "model": "sonnet"
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|-------|------|----------|-------------|
+| `prompt` | string | Yes | 送信するプロンプト |
+| `projectPath` | string | No | **新規**セッションの作業ディレクトリ。`sessionId`がある場合は無視される |
+| `sessionId` | string | No | 指定した場合、既存セッションにプロンプトを送信する（`--resume`）。省略時は新規セッションを開始 |
+| `model` | string | No | 使用するモデル |
+
+ディスパッチには`config.send.defaultAllowedTools`を使用します（REST版Send APIと同じ）。QoSは0（fire-and-forget）固定で、publisher側への配信確認はありません。broker接続が切れている間にpublishされたコマンドは黙って失われます。
+
+**セキュリティ上の注意:** `mqtt.password`は一切露出しません。webhookペイロード（`mqttCommandTopic`として）および`GET /info`に含まれるのは`commandTopic`のみで、viewer側はbrokerの認証情報を知ることなくコマンドのpublish先を把握できます。
+
+**プラットフォームに関する注意:** Windows nativeは`claude -p`に非対応（`node-pty`が必要）です。Windows nativeで`config.mqtt`が設定されている場合、起動時に警告ログを出力し接続しません。
+
 ### Cancel Mode
 
 #### `POST /sessions/:id/cancel`
@@ -818,7 +849,7 @@ curl http://localhost:3100/version
 {
   "name": "claude-code-pipe",
   "version": "0.5.0",
-  "description": "A pipe for Claude Code input/output using JSONL and Express + WebSocket"
+  "description": "A pipe for Claude Code input/output using JSONL and Express"
 }
 ```
 
@@ -829,6 +860,44 @@ curl http://localhost:3100/version
 | `name` | string | パッケージ名 |
 | `version` | string | 現在のバージョン（package.json より） |
 | `description` | string | パッケージの説明 |
+
+#### `GET /info`
+
+このpipeの現在の設定状態を取得します。初回接続時のviewer側の把握・デバッグ用です。継続的なステータス把握には、このエンドポイントをポーリングするのではなく、全webhookペイロードに含まれる`communicationMode`フィールドを使う方が適しています。
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/info
+```
+
+**レスポンス:**
+
+```json
+{
+  "version": "0.8.9",
+  "os": "linux",
+  "communicationMode": "bidirectional",
+  "callbackUrl": "http://viewer1:3100",
+  "mqttCommandTopic": "claude/pipe-A/send",
+  "subscriberCount": 2,
+  "projectTitle": "My Project",
+  "watchDir": "~/.claude/projects"
+}
+```
+
+**フィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `version` | string | 現在のバージョン（package.json より） |
+| `os` | string | `"linux"`、`"mac"`、`"windows"`のいずれか（WSLは`"linux"`として報告） |
+| `communicationMode` | string | `"watch-only"`（subscriberなし）、`"webhook-only"`（subscriberはあるが`callbackUrl`/`mqtt.commandTopic`なし）、`"bidirectional"`（subscriberがあり`callbackUrl`および/または`mqtt.commandTopic`もあり） |
+| `callbackUrl` | string\|null | `config.callbackUrl`。未設定時は`null` |
+| `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`。MQTT未設定時は`null`。brokerのURL・認証情報は一切含まれない |
+| `subscriberCount` | number | 設定済み`subscribers`の件数 |
+| `projectTitle` | string\|null | `config.projectTitle`。未設定時は`null` |
+| `watchDir` | string | `config.watchDir` |
 
 #### `GET /projects`
 
@@ -1689,7 +1758,6 @@ claude-code-pipe/
 - メインエントリポイント
 - Express サーバーセットアップ
 - 認証ミドルウェア（Bearer Token）
-- ローカル Web UI 用 WebSocket サーバー
 - ルート登録
 
 #### src/api.js
