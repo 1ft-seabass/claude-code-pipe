@@ -5,6 +5,12 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [セマンティック バージョニング](https://semver.org/lang/ja/spec/v2.0.0.html) に準拠しています。
 
+## [0.9.1] - 2026-10-01
+
+### 追加
+- **`GET /sessions/:id/signals`**: メッセージ本文を含まない「シグナル」タイムラインを返す。`type`(`user`/`assistant`/`tool-use`)・時刻・`textBytes`(テキスト部分のUTF-8バイト数)のみで本文は含まない。`tool-use`の所要時間は`tool_use`ブロックと対応する`tool_result`の`tool_use_id`突合のみから算出し、ターンを跨いだ所要時間の合成は行わない。会話内容を露出せずに活動の形状だけ必要なダッシュボード・インジケーター向け
+- **`backendType`フィールド**: webhookペイロードおよび`GET /info`に`backendType: "claude_code"`(固定値)を追加。将来複数種類のpipeを集約するviewer側で発生元を区別できるようにするため
+
 ## [0.9.0] - 2026-09-20
 
 ### 追加
