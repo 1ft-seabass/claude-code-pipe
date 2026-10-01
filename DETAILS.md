@@ -656,6 +656,51 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?p
 > **Difference from existing endpoints (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`):**
 > Existing endpoints filter by `role` only, so `tool_result` (user role) and `tool_use` (assistant role) may be included. The `chat` versions check content type and return only pure conversation messages.
 
+#### `GET /sessions/:id/signals`
+
+Get a session's events as a message-content-free "signal" timeline: type, timing, and text size only — no message bodies. Useful for dashboards/indicators that need activity shape without exposing conversation content.
+
+**Query Parameters:**
+
+- `projectPath` (optional): Filter by project path when multiple sessions with the same ID exist across different projects
+
+**Request:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/signals
+```
+
+**Response:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "signals": [
+    { "type": "user", "start": "2026-10-01T10:00:00.000Z", "end": "2026-10-01T10:00:00.000Z", "durationMs": 0, "textBytes": 15 },
+    { "type": "tool-use", "toolName": "Bash", "start": "2026-10-01T10:00:01.000Z", "end": "2026-10-01T10:00:01.050Z", "durationMs": 50 },
+    { "type": "assistant", "start": "2026-10-01T10:00:02.000Z", "end": "2026-10-01T10:00:02.000Z", "durationMs": 0, "textBytes": 120 }
+  ]
+}
+```
+
+**Signal Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | `"user"`, `"assistant"`, or `"tool-use"` |
+| `toolName` | string | Tool name (only present when `type` is `"tool-use"`) |
+| `start` | string | ISO timestamp |
+| `end` | string\|null | ISO timestamp. `null` if a `tool-use` never received a matching `tool_result` (e.g. truncated session) |
+| `durationMs` | number\|null | `0` for `user`/`assistant` (point-in-time markers); for `tool-use`, the gap between the tool call and its result; `null` if `end` is `null` |
+| `textBytes` | number | UTF-8 byte length of the turn's text content (`thinking` excluded). Only present for `user`/`assistant` |
+
+**Behavior notes:**
+
+- One signal per JSONL line for `user`/`assistant` turns that contain actual text (a line with only `tool_use`/`tool_result` blocks produces no `user`/`assistant` signal, only the resulting `tool-use` signal)
+- `tool-use` duration is derived strictly from matching `tool_use_id` between the assistant's `tool_use` block and the following `tool_result` — no cross-turn or cross-line duration synthesis is attempted
+- `isMeta` lines are excluded, same as `textOnly` on `GET /sessions/:id/messages`
+- Subagent conversations live in separate JSONL files with their own session IDs (under a `subagents/` subdirectory), so they never appear in a parent session's signal list
+
 ### Send Mode
 
 #### `POST /sessions/new`

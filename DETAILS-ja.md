@@ -656,6 +656,51 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?p
 > **既存エンドポイント (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`) との違い:**
 > 既存エンドポイントは `role` のみでフィルタするため、`tool_result`（user role）や `tool_use`（assistant role）が含まれることがあります。`chat` 版は content type を確認し、純粋な会話メッセージのみを返します。
 
+#### `GET /sessions/:id/signals`
+
+セッションのイベントを、メッセージ本文を含まない「シグナル」タイムライン(型・時刻・テキスト量のみ)として取得します。会話内容を露出せずに活動の形状だけ必要なダッシュボード・インジケーター向けです。
+
+**クエリパラメータ:**
+
+- `projectPath`(任意): 複数プロジェクトに同一IDのセッションが存在する場合の絞り込み
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/signals
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "signals": [
+    { "type": "user", "start": "2026-10-01T10:00:00.000Z", "end": "2026-10-01T10:00:00.000Z", "durationMs": 0, "textBytes": 15 },
+    { "type": "tool-use", "toolName": "Bash", "start": "2026-10-01T10:00:01.000Z", "end": "2026-10-01T10:00:01.050Z", "durationMs": 50 },
+    { "type": "assistant", "start": "2026-10-01T10:00:02.000Z", "end": "2026-10-01T10:00:02.000Z", "durationMs": 0, "textBytes": 120 }
+  ]
+}
+```
+
+**シグナルのフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `type` | string | `"user"`、`"assistant"`、`"tool-use"`のいずれか |
+| `toolName` | string | ツール名(`type`が`"tool-use"`の場合のみ) |
+| `start` | string | ISOタイムスタンプ |
+| `end` | string\|null | ISOタイムスタンプ。`tool-use`が対応する`tool_result`を受け取れなかった場合(セッションが途中で切れている等)は`null` |
+| `durationMs` | number\|null | `user`/`assistant`(1時点のマーカー)は常に`0`。`tool-use`はツール呼び出しと結果の間の時間。`end`が`null`の場合は`null` |
+| `textBytes` | number | そのターンのテキスト部分のUTF-8バイト数(`thinking`は含まない)。`user`/`assistant`のみ存在 |
+
+**挙動の補足:**
+
+- `user`/`assistant`は、実際にテキストを含むJSONL行につき1シグナル(`tool_use`/`tool_result`ブロックのみの行は`user`/`assistant`シグナルを出さず、結果として生じる`tool-use`シグナルのみ出す)
+- `tool-use`の所要時間は、assistant側の`tool_use`ブロックと後続の`tool_result`ブロックの`tool_use_id`の対応付けのみから算出する(ターンやJSONL行を跨いだ所要時間の合成は一切行わない)
+- `isMeta`の行は除外する(`GET /sessions/:id/messages`の`textOnly`と同じ扱い)
+- サブエージェントの会話は`subagents/`サブディレクトリ配下の別JSONLファイル・別sessionIdとして存在するため、親セッションのシグナル一覧には現れない
+
 ### Send Mode
 
 #### `POST /sessions/new`
