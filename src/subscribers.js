@@ -213,7 +213,7 @@ function setupSubscribers(subscribers, watcher, processEvents, config = {}) {
     communicationMode = 'webhook-only';
   }
 
-  const serverInfo = { cwdPath, cwdName, projectTitle, callbackUrl, os: getOsInfo(), communicationMode, mqttCommandTopic };
+  const serverInfo = { cwdPath, cwdName, projectTitle, callbackUrl, os: getOsInfo(), communicationMode, mqttCommandTopic, backendType: 'claude_code' };
 
   // セッションごとの最終タイムスタンプ（応答時間計算用）
   const sessionTimestamps = new Map();
@@ -282,6 +282,7 @@ function handleProcessEvent(subscriber, eventType, event, serverInfo) {
     callbackUrl: serverInfo.callbackUrl,
     os: serverInfo.os,
     communicationMode: serverInfo.communicationMode,
+    backendType: serverInfo.backendType,
     ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
     ...(projectPath && { projectPath }),
     ...(projectName && { projectName }),
@@ -329,6 +330,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       callbackUrl: serverInfo.callbackUrl,
       os: serverInfo.os,
       communicationMode: serverInfo.communicationMode,
+      backendType: serverInfo.backendType,
       ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
       ...(projectPath && { projectPath }),
       ...(projectName && { projectName }),
@@ -375,6 +377,7 @@ function handleSubscriberEvent(subscriber, event, sessionTimestamps, serverInfo)
       callbackUrl: serverInfo.callbackUrl,
       os: serverInfo.os,
       communicationMode: serverInfo.communicationMode,
+      backendType: serverInfo.backendType,
       ...(serverInfo.mqttCommandTopic && { mqttCommandTopic: serverInfo.mqttCommandTopic }),
       ...(projectPath && { projectPath }),
       ...(projectName && { projectName }),

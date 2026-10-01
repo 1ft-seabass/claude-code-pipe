@@ -923,6 +923,7 @@ curl http://localhost:3100/info
   "version": "0.8.9",
   "os": "linux",
   "communicationMode": "bidirectional",
+  "backendType": "claude_code",
   "callbackUrl": "http://viewer1:3100",
   "mqttCommandTopic": "claude/pipe-A/send",
   "subscriberCount": 2,
@@ -938,6 +939,7 @@ curl http://localhost:3100/info
 | `version` | string | Current version (from package.json) |
 | `os` | string | `"linux"`, `"mac"`, or `"windows"` (WSL is reported as `"linux"`) |
 | `communicationMode` | string | `"watch-only"` (no subscribers), `"webhook-only"` (subscribers but no `callbackUrl`/`mqtt.commandTopic`), or `"bidirectional"` (subscribers with `callbackUrl` and/or `mqtt.commandTopic`) |
+| `backendType` | string | Always `"claude_code"` for this pipe. Lets a viewer that aggregates multiple pipe types distinguish the source |
 | `callbackUrl` | string\|null | `config.callbackUrl`, or `null` if unset |
 | `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`, or `null` if MQTT is unset. Broker URL/credentials are never included |
 | `subscriberCount` | number | Number of configured `subscribers` |
@@ -1474,6 +1476,7 @@ All events include these metadata fields:
 | `cwdName` | string | Base name of the server's working directory |
 | `callbackUrl` | string | Callback URL for this server (null if not set in config.json) |
 | `os` | string | Server OS: `"mac"`, `"linux"`, or `"windows"` (WSL is `"linux"`) |
+| `backendType` | string | Always `"claude_code"` for this pipe. Lets a viewer that aggregates multiple pipe types distinguish the source |
 | `projectPath` | string | Full path of the session's project directory (optional, extracted from JSONL path) |
 | `projectName` | string | Base name of the session's project directory (optional, extracted from JSONL path) |
 | `projectTitle` | string | User-defined project title (optional, only if set in config.json) |
@@ -1493,6 +1496,7 @@ All events include these metadata fields:
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1544,6 +1548,7 @@ All events include these metadata fields:
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "model": "claude-sonnet-4-6",
@@ -1562,6 +1567,7 @@ All events include these metadata fields:
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1592,6 +1598,7 @@ All events include these metadata fields:
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -1610,6 +1617,7 @@ All events include these metadata fields:
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"

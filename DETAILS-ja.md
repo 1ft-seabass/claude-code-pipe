@@ -923,6 +923,7 @@ curl http://localhost:3100/info
   "version": "0.8.9",
   "os": "linux",
   "communicationMode": "bidirectional",
+  "backendType": "claude_code",
   "callbackUrl": "http://viewer1:3100",
   "mqttCommandTopic": "claude/pipe-A/send",
   "subscriberCount": 2,
@@ -938,6 +939,7 @@ curl http://localhost:3100/info
 | `version` | string | 現在のバージョン（package.json より） |
 | `os` | string | `"linux"`、`"mac"`、`"windows"`のいずれか（WSLは`"linux"`として報告） |
 | `communicationMode` | string | `"watch-only"`（subscriberなし）、`"webhook-only"`（subscriberはあるが`callbackUrl`/`mqtt.commandTopic`なし）、`"bidirectional"`（subscriberがあり`callbackUrl`および/または`mqtt.commandTopic`もあり） |
+| `backendType` | string | 常に`"claude_code"`（このpipe固有の値）。複数種類のpipeを集約するviewer側で発生元を区別できる |
 | `callbackUrl` | string\|null | `config.callbackUrl`。未設定時は`null` |
 | `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`。MQTT未設定時は`null`。brokerのURL・認証情報は一切含まれない |
 | `subscriberCount` | number | 設定済み`subscribers`の件数 |
@@ -1474,6 +1476,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 | `cwdName` | string | サーバーの作業ディレクトリ名（ディレクトリのベース名） |
 | `callbackUrl` | string | このサーバーのコールバック URL（config.json で未設定の場合は null） |
 | `os` | string | サーバーの OS 種別: `"mac"`, `"linux"`, `"windows"`（WSL は `"linux"`） |
+| `backendType` | string | 常に`"claude_code"`（このpipe固有の値）。複数種類のpipeを集約するviewer側で発生元を区別できる |
 | `projectPath` | string | セッションのプロジェクトディレクトリのフルパス（オプション、JSONL パスから抽出） |
 | `projectName` | string | セッションのプロジェクトディレクトリ名（オプション、JSONL パスから抽出） |
 | `projectTitle` | string | ユーザー定義のプロジェクトタイトル（config.json で設定した場合のみ、オプション） |
@@ -1493,6 +1496,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1544,6 +1548,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "model": "claude-sonnet-4-6",
@@ -1562,6 +1567,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1592,6 +1598,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -1610,6 +1617,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"

@@ -261,6 +261,7 @@ function createApiRouter(watchDir, config) {
       version: packageJson.version,
       os: getOsInfo(),
       communicationMode,
+      backendType: 'claude_code',
       callbackUrl: config.callbackUrl || null,
       mqttCommandTopic,
       subscriberCount,
