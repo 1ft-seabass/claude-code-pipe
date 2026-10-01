@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-10-01
+
+### Added
+- **`GET /sessions/:id/signals`**: returns a message-content-free "signal" timeline for a session — `type` (`user`/`assistant`/`tool-use`), timing, and `textBytes` (UTF-8 byte length of text content), with no message bodies. `tool-use` duration is derived strictly from matching `tool_use_id` between a `tool_use` block and its `tool_result`; no cross-turn duration synthesis is attempted. Useful for dashboards/indicators that need activity shape without exposing conversation content
+- **`backendType` field**: webhook payloads and `GET /info` now include `backendType: "claude_code"` (a fixed value), so viewers that may aggregate multiple pipe types in the future can distinguish the source
+
 ## [0.9.0] - 2026-09-20
 
 ### Added

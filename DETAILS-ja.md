@@ -656,6 +656,51 @@ curl "http://localhost:3100/sessions/SESSION_ID/messages/chat/assistant/latest?p
 > **既存エンドポイント (`user/first`, `user/latest`, `assistant/first`, `assistant/latest`) との違い:**
 > 既存エンドポイントは `role` のみでフィルタするため、`tool_result`（user role）や `tool_use`（assistant role）が含まれることがあります。`chat` 版は content type を確認し、純粋な会話メッセージのみを返します。
 
+#### `GET /sessions/:id/signals`
+
+セッションのイベントを、メッセージ本文を含まない「シグナル」タイムライン(型・時刻・テキスト量のみ)として取得します。会話内容を露出せずに活動の形状だけ必要なダッシュボード・インジケーター向けです。
+
+**クエリパラメータ:**
+
+- `projectPath`(任意): 複数プロジェクトに同一IDのセッションが存在する場合の絞り込み
+
+**リクエスト:**
+
+```bash
+curl http://localhost:3100/sessions/SESSION_ID/signals
+```
+
+**レスポンス:**
+
+```json
+{
+  "sessionId": "01234567-89ab-cdef-0123-456789abcdef",
+  "signals": [
+    { "type": "user", "start": "2026-10-01T10:00:00.000Z", "end": "2026-10-01T10:00:00.000Z", "durationMs": 0, "textBytes": 15 },
+    { "type": "tool-use", "toolName": "Bash", "start": "2026-10-01T10:00:01.000Z", "end": "2026-10-01T10:00:01.050Z", "durationMs": 50 },
+    { "type": "assistant", "start": "2026-10-01T10:00:02.000Z", "end": "2026-10-01T10:00:02.000Z", "durationMs": 0, "textBytes": 120 }
+  ]
+}
+```
+
+**シグナルのフィールド:**
+
+| フィールド | 型 | 説明 |
+|-------|------|-------------|
+| `type` | string | `"user"`、`"assistant"`、`"tool-use"`のいずれか |
+| `toolName` | string | ツール名(`type`が`"tool-use"`の場合のみ) |
+| `start` | string | ISOタイムスタンプ |
+| `end` | string\|null | ISOタイムスタンプ。`tool-use`が対応する`tool_result`を受け取れなかった場合(セッションが途中で切れている等)は`null` |
+| `durationMs` | number\|null | `user`/`assistant`(1時点のマーカー)は常に`0`。`tool-use`はツール呼び出しと結果の間の時間。`end`が`null`の場合は`null` |
+| `textBytes` | number | そのターンのテキスト部分のUTF-8バイト数(`thinking`は含まない)。`user`/`assistant`のみ存在 |
+
+**挙動の補足:**
+
+- `user`/`assistant`は、実際にテキストを含むJSONL行につき1シグナル(`tool_use`/`tool_result`ブロックのみの行は`user`/`assistant`シグナルを出さず、結果として生じる`tool-use`シグナルのみ出す)
+- `tool-use`の所要時間は、assistant側の`tool_use`ブロックと後続の`tool_result`ブロックの`tool_use_id`の対応付けのみから算出する(ターンやJSONL行を跨いだ所要時間の合成は一切行わない)
+- `isMeta`の行は除外する(`GET /sessions/:id/messages`の`textOnly`と同じ扱い)
+- サブエージェントの会話は`subagents/`サブディレクトリ配下の別JSONLファイル・別sessionIdとして存在するため、親セッションのシグナル一覧には現れない
+
 ### Send Mode
 
 #### `POST /sessions/new`
@@ -878,6 +923,7 @@ curl http://localhost:3100/info
   "version": "0.8.9",
   "os": "linux",
   "communicationMode": "bidirectional",
+  "backendType": "claude_code",
   "callbackUrl": "http://viewer1:3100",
   "mqttCommandTopic": "claude/pipe-A/send",
   "subscriberCount": 2,
@@ -893,6 +939,7 @@ curl http://localhost:3100/info
 | `version` | string | 現在のバージョン（package.json より） |
 | `os` | string | `"linux"`、`"mac"`、`"windows"`のいずれか（WSLは`"linux"`として報告） |
 | `communicationMode` | string | `"watch-only"`（subscriberなし）、`"webhook-only"`（subscriberはあるが`callbackUrl`/`mqtt.commandTopic`なし）、`"bidirectional"`（subscriberがあり`callbackUrl`および/または`mqtt.commandTopic`もあり） |
+| `backendType` | string | 常に`"claude_code"`（このpipe固有の値）。複数種類のpipeを集約するviewer側で発生元を区別できる |
 | `callbackUrl` | string\|null | `config.callbackUrl`。未設定時は`null` |
 | `mqttCommandTopic` | string\|null | `config.mqtt.commandTopic`。MQTT未設定時は`null`。brokerのURL・認証情報は一切含まれない |
 | `subscriberCount` | number | 設定済み`subscribers`の件数 |
@@ -1429,6 +1476,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
 | `cwdName` | string | サーバーの作業ディレクトリ名（ディレクトリのベース名） |
 | `callbackUrl` | string | このサーバーのコールバック URL（config.json で未設定の場合は null） |
 | `os` | string | サーバーの OS 種別: `"mac"`, `"linux"`, `"windows"`（WSL は `"linux"`） |
+| `backendType` | string | 常に`"claude_code"`（このpipe固有の値）。複数種類のpipeを集約するviewer側で発生元を区別できる |
 | `projectPath` | string | セッションのプロジェクトディレクトリのフルパス（オプション、JSONL パスから抽出） |
 | `projectName` | string | セッションのプロジェクトディレクトリ名（オプション、JSONL パスから抽出） |
 | `projectTitle` | string | ユーザー定義のプロジェクトタイトル（config.json で設定した場合のみ、オプション） |
@@ -1448,6 +1496,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1499,6 +1548,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "model": "claude-sonnet-4-6",
@@ -1517,6 +1567,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectPath": "/home/user/projects/my-app",
   "projectName": "my-app",
   "projectTitle": "My Application",
@@ -1547,6 +1598,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "sender",
@@ -1565,6 +1617,7 @@ Webhook は以下の構造で POST リクエストを受け取ります。
   "cwdName": "claude-code-pipe",
   "callbackUrl": "http://claude-code-pipe:3100",
   "os": "linux",
+  "backendType": "claude_code",
   "projectTitle": "My Application",
   "pid": 12345,
   "source": "canceller"

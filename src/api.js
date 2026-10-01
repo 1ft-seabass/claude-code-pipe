@@ -261,6 +261,7 @@ function createApiRouter(watchDir, config) {
       version: packageJson.version,
       os: getOsInfo(),
       communicationMode,
+      backendType: 'claude_code',
       callbackUrl: config.callbackUrl || null,
       mqttCommandTopic,
       subscriberCount,
@@ -517,6 +518,94 @@ function createApiRouter(watchDir, config) {
     if (!text.trim()) return null;
     return { role: msg.role, timestamp: event.timestamp, text };
   }
+
+  // content（string または content block 配列）から text ブロックのUTF-8バイト数を算出
+  // thinking/tool_use/tool_result は含めない
+  function getTextBytes(content) {
+    if (typeof content === 'string') return Buffer.byteLength(content, 'utf8');
+    if (!Array.isArray(content)) return 0;
+    const text = content.filter(item => item.type === 'text').map(item => item.text || '').join('');
+    return Buffer.byteLength(text, 'utf8');
+  }
+
+  // イベント列を「シグナル」(メッセージ本文を含まない型・時刻・所要時間の配列)に変換する
+  // - user/assistant: その行のtimestampを start=end とする1時点のマーカー（durationMs は常に0）
+  // - tool-use: assistant行のtool_useブロックと、後続user行の対応するtool_resultブロックを
+  //   tool_use_id で対応付け、両者のtimestamp差分をdurationMsとする
+  // - tool_resultのみのuser行は単独シグナルを出さない（対応するtool-useのendとして吸収される）
+  // - isMetaの行は除外（extractTextTurnと同じ扱い）
+  function buildSignals(events) {
+    const signals = [];
+    const pendingToolUses = new Map(); // tool_use_id -> signal
+
+    for (const event of events) {
+      if (event.isMeta) continue;
+      const role = event.message?.role;
+      if (role !== 'user' && role !== 'assistant') continue;
+
+      const content = event.message.content;
+      const blocks = Array.isArray(content) ? content : [];
+
+      // tool_result を先に処理して、対応するtool-useシグナルを完結させる
+      const toolResults = blocks.filter(item => item.type === 'tool_result');
+      for (const toolResult of toolResults) {
+        const pending = pendingToolUses.get(toolResult.tool_use_id);
+        if (pending) {
+          pending.end = event.timestamp;
+          pending.durationMs = new Date(event.timestamp).getTime() - new Date(pending.start).getTime();
+          pendingToolUses.delete(toolResult.tool_use_id);
+        }
+      }
+
+      if (role === 'assistant') {
+        const toolUses = blocks.filter(item => item.type === 'tool_use');
+        for (const toolUse of toolUses) {
+          const signal = { type: 'tool-use', toolName: toolUse.name, start: event.timestamp, end: null, durationMs: null };
+          signals.push(signal);
+          pendingToolUses.set(toolUse.id, signal);
+        }
+
+        const textBytes = getTextBytes(content);
+        if (textBytes > 0) {
+          signals.push({ type: 'assistant', start: event.timestamp, end: event.timestamp, durationMs: 0, textBytes });
+        }
+      } else {
+        // role === 'user': tool_resultのみの行は単独シグナルを出さない
+        const isToolResultOnly = toolResults.length > 0 && blocks.every(item => item.type === 'tool_result');
+        if (!isToolResultOnly) {
+          const textBytes = getTextBytes(content);
+          signals.push({ type: 'user', start: event.timestamp, end: event.timestamp, durationMs: 0, textBytes });
+        }
+      }
+    }
+
+    return signals;
+  }
+
+  // GET /sessions/:id/signals - メッセージ本文を含まない「シグナル」配列
+  // (type, 時刻, 所要時間, テキストバイト数)。サブエージェントは別ファイル・別sessionIdのため自然に除外される
+  router.get('/sessions/:id/signals', async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const projectPath = req.query.projectPath;
+      const jsonlPath = await getSessionJSONLPath(sessionId, projectPath);
+
+      if (!jsonlPath) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      const events = await parseJSONLFile(jsonlPath);
+      const signals = buildSignals(events);
+
+      res.json({
+        sessionId,
+        signals
+      });
+    } catch (error) {
+      console.error('[api] Error getting session signals:', error);
+      res.status(500).json({ error: 'Failed to get session signals' });
+    }
+  });
 
   // GET /sessions/:id/messages - 全メッセージ一覧
   // ?textOnly=true でtool_use/tool_result/isMetaを除いた本文だけの配列に整形
